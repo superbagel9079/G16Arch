@@ -104,7 +104,6 @@
     - [LUKS Key Management](#luks-key-management)
     - [Backup Critical Data](#backup-critical-data)
     - [Emergency Recovery](#emergency-recovery)
-    - [NVIDIA Power Management](#nvidia-power-management)
 
 22. [Troubleshooting](#troubleshooting)
     - [System Won't Boot](#system-won't-boot)
