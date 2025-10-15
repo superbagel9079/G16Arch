@@ -26,4 +26,4 @@ This repository contains optimized guides for the following system:
 
 This repository includes the following documentation:
 
-- **[Installation Guide](guides/Arch Linux Installation Guide with Full-Disk Encryption and Secure Boot.md)**: Complete Arch Linux installation with full-disk encryption, LVM, and Secure Boot
+- **[Installation Guide](./Arch Linux Installation Guide with Full-Disk Encryption and Secure Boot.md)**: Complete Arch Linux installation with full-disk encryption, LVM, and Secure Boot
