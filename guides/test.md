@@ -72,80 +72,83 @@ Part V: Reference
     Configuration Templates
     Additional Resources
 
-Part I: Planning and Preparation
-Document Overview
+## Part I: Planning and Preparation
+
+### Document Overview
 
 This guide provides a complete walkthrough for installing Arch Linux with enterprise-grade security features. The installation implements full-disk encryption using LUKS2, Logical Volume Management for flexible storage, Unified Kernel Images for improved boot security, and Secure Boot for firmware-level protection.
 
-Target Audience: Users with intermediate Linux knowledge seeking a secure, production-ready Arch Linux installation.
+**Target Audience**: Users with intermediate Linux knowledge seeking a secure, production-ready Arch Linux installation.
 
-Estimated Time: 2-4 hours for first-time installation.
+**Estimated Time**: 2-4 hours for first-time installation.
 
-Skill Level: Intermediate to Advanced.
-Prerequisites and System Requirements
-Hardware Requirements
+**Skill Level**: Intermediate to Advanced.
 
-    UEFI firmware (Legacy/CSM mode not supported)
-    NVMe SSD (guide uses /dev/nvme0n1 as example)
-    Minimum 8GB RAM (16GB+ recommended for VMs)
-    Minimum 100GB storage (200GB+ recommended)
-    Active internet connection
-    NVIDIA GPU (optional, guide includes driver setup)
-    Intel CPU (guide uses intel-ucode, substitute amd-ucode for AMD)
+---
 
-Software Requirements
+### Prerequisites and System Requirements
 
-    Arch Linux installation ISO (latest version)
-    USB drive for installation media (2GB minimum)
+**Hardware Requirements**
 
-Knowledge Prerequisites
+- UEFI firmware (Legacy/CSM mode not supported)
+- NVMe SSD (guide uses /dev/nvme0n1 as example)
+- Minimum 8GB RAM (16GB+ recommended for VMs)
+- Minimum 100GB storage (200GB+ recommended)
+- Active internet connection
+- NVIDIA GPU (optional, guide includes driver setup)
+- Intel CPU (guide uses intel-ucode, substitute amd-ucode for AMD)
 
-    Basic understanding of Linux command line
-    Familiarity with disk partitioning concepts
-    Understanding of encryption fundamentals
-    Ability to access UEFI firmware settings
+**Software Requirements**
 
-    [!WARNING]
-    Data Loss Warning
+- Arch Linux installation ISO (latest version)
+- USB drive for installation media (2GB minimum)
 
-    This procedure will completely erase all data on the target drive. This action is irreversible.
+**Knowledge Prerequisites**
 
-    Before proceeding:
+- Basic understanding of Linux command line
+- Familiarity with disk partitioning concepts
+- Understanding of encryption fundamentals
+- Ability to access UEFI firmware settings
 
-        Verify target drive with lsblk -d | grep disk
-        Backup all important data
-        Disconnect other storage devices to prevent accidental erasure
-        Double-check all commands before executing
+---
 
-    [!NOTE]
-    Pre-Flight Checklist
+>[!WARNING]
+>**Data Loss Warning**
+>
+>This procedure will completely erase all data on the target drive. This action is irreversible.
+>
+>Before proceeding:
+>- Verify target drive with lsblk -d | grep disk
+>- Backup all important data
+>- Disconnect other storage devices to prevent accidental erasure
+>- Double-check all commands before executing
 
-    Complete these verifications before starting:
+---
 
-    System Checks:
-
-        System boots in UEFI mode: [ -d /sys/firmware/efi ] && echo "UEFI" || echo "BIOS"
-        Target drive identified: lsblk -d | grep disk
-        Sufficient time allocated (2-4 hours)
-
-    Network Checks:
-
-        Internet connection active: ping -c 3 archlinux.org
-        DNS resolution working: nslookup archlinux.org
-
-    Preparation Checks:
-
-        LUKS passphrase prepared (20+ characters recommended)
-        Root password decided
-        Username decided
-        All important data backed up
-
-    Documentation:
-
-        This guide accessible during installation
-        Alternative device available for reference
-
-    If any check fails, resolve the issue before proceeding.
+>[!NOTE]
+>**Pre-Flight Checklist**
+>
+>Complete these verifications before starting:
+>
+>**System Checks**:
+>- [ ] System boots in UEFI mode: [ -d /sys/firmware/efi ] && echo "UEFI" || echo "BIOS"
+>- [ ] Target drive identified: lsblk -d | grep disk
+>- [ ] Sufficient time allocated (2-4 hours)
+>
+>**Network Checks**:
+>- [ ] Internet connection active: ping -c 3 archlinux.org
+>- [ ] DNS resolution working: nslookup archlinux.org
+>
+>**Preparation Checks**:
+>- [ ] LUKS passphrase prepared (20+ characters recommended)
+>- [ ] Root password decided
+>- [ ] Username decided
+>- [ ] All important data backed up
+>**Documentation**:
+>- [ ] This guide accessible during installation
+>- [ ] Alternative device available for reference
+>
+>If any check fails, resolve the issue before proceeding.
 
 Understanding the Storage Layout
 
