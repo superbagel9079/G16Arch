@@ -16,10 +16,6 @@ Always backup your data before following any installation guide. Verify all comm
 
 Actively maintained and updated for Arch Linux rolling release.
 
-## License
-
-Documentation provided as-is for educational purposes.
-
 ## Table of Contents
 
 1. [Prerequisites and Assumptions](#prerequisites-and-assumptions)
@@ -1611,3 +1607,6 @@ Swap should be at least equal to RAM size for hibernation.
 - [systemd-boot Documentation](https://man.archlinux.org/man/systemd-boot.7)
 - [zram Documentation](https://wiki.archlinux.org/title/Zram)
 
+## License
+
+Documentation provided as-is for educational purposes.
