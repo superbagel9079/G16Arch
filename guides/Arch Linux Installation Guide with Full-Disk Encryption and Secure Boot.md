@@ -354,17 +354,17 @@ vgcreate leo-vms /dev/mapper/cryptvms
 **System volumes:**
 
 ```bash
-lvcreate -L 38G     -n swap  leo-os
-lvcreate -l 25%FREE -n root  leo-os
-lvcreate -l 20%FREE -n var   leo-os
-lvcreate -l 15%FREE -n home  leo-os
-lvcreate -l  5%FREE -n data  leo-os
+lvcreate -L 38G -n swap leo-os
+lvcreate -l 25%FREE -n root leo-os
+lvcreate -l 20%FREE -n var leo-os
+lvcreate -l 15%FREE -n home leo-os
+lvcreate -l  5%FREE -n data leo-os
 ```
 
 **VM storage:**
 
 ```bash
-lvcreate -l 50%FREE -n vms   leo-vms
+lvcreate -l 50%FREE -n vms leo-vms
 ```
 
 Verify the layout:
@@ -1441,55 +1441,6 @@ mount /dev/nvme0n1p1 /mnt/boot
 ```bash
 arch-chroot /mnt
 # Perform repairs
-```
-
----
-
-## Performance Tuning
-
-### SSD Optimization
-
-Verify (Continuous) TRIM support:
-
-```bash
-lsblk --discard
-```
-
-Check TRIM is working:
-
-```bash
-systemctl status fstrim.timer
-journalctl -u fstrim.service
-```
-
-### Swap and Hibernation Testing
-
-Test hibernation:
-
-```bash
-systemctl hibernate
-```
-
-Adjust swappiness if needed:
-
-```bash
-echo "vm.swappiness=10" > /etc/sysctl.d/99-swappiness.conf
-sysctl -p /etc/sysctl.d/99-swappiness.conf
-```
-
-> [!tip] 
-> Lower swappiness values reduce swap usage. For systems with ample RAM, `10` or `20` is appropriate. Default is `60`.
-
-### NVIDIA Power Management
-
-For laptops with NVIDIA Optimus:
-
-```bash
-# Check available power profiles
-power-profiles-daemon list
-
-# Set profile
-power-profiles-daemon set power-saver
 ```
 
 ---
