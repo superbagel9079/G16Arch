@@ -159,14 +159,12 @@ This guide implements a three-partition layout optimized for security, flexibili
 
 **Partition Structure**
 
-`
 /dev/nvme0n1
 ├─ nvme0n1p1    ESP (1 GiB, FAT32)
 ├─ nvme0n1p2    LUKS2 → cryptos → LVM (leo-os)
 │                └─ root, var, home, swap, data
 └─ nvme0n1p3    LUKS2 → cryptvms → LVM (leo-vms)
                  └─ vms
-`
 
 **Partition Purposes**
 
