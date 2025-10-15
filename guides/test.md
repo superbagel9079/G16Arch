@@ -91,12 +91,12 @@ This guide provides a complete walkthrough for installing Arch Linux with enterp
 **Hardware Requirements**
 
 - UEFI firmware (Legacy/CSM mode not supported)
-- NVMe SSD (guide uses /dev/nvme0n1 as example)
+- NVMe SSD (guide uses `/dev/nvme0n1` as example)
 - Minimum 8GB RAM (16GB+ recommended for VMs)
 - Minimum 100GB storage (200GB+ recommended)
 - Active internet connection
 - NVIDIA GPU (optional, guide includes driver setup)
-- Intel CPU (guide uses intel-ucode, substitute amd-ucode for AMD)
+- Intel CPU (guide uses `intel-ucode`, substitute `amd-ucode` for AMD)
 
 **Software Requirements**
 
@@ -118,7 +118,7 @@ This guide provides a complete walkthrough for installing Arch Linux with enterp
 >This procedure will completely erase all data on the target drive. This action is irreversible.
 >
 >Before proceeding:
->- Verify target drive with lsblk -d | grep disk
+>- Verify target drive with `lsblk -d | grep disk`
 >- Backup all important data
 >- Disconnect other storage devices to prevent accidental erasure
 >- Double-check all commands before executing
@@ -131,88 +131,90 @@ This guide provides a complete walkthrough for installing Arch Linux with enterp
 >Complete these verifications before starting:
 >
 >**System Checks**:
->- [ ] System boots in UEFI mode: [ -d /sys/firmware/efi ] && echo "UEFI" || echo "BIOS"
->- [ ] Target drive identified: lsblk -d | grep disk
+>- [ ] System boots in UEFI mode: `[ -d /sys/firmware/efi ] && echo "UEFI" || echo "BIOS"`
+>- [ ] Target drive identified: `lsblk -d | grep disk`
 >- [ ] Sufficient time allocated (2-4 hours)
 >
 >**Network Checks**:
->- [ ] Internet connection active: ping -c 3 archlinux.org
->- [ ] DNS resolution working: nslookup archlinux.org
+>- [ ] Internet connection active: `ping -c 3 archlinux.org`
+>- [ ] DNS resolution working: `nslookup archlinux.org`
 >
 >**Preparation Checks**:
 >- [ ] LUKS passphrase prepared (20+ characters recommended)
 >- [ ] Root password decided
 >- [ ] Username decided
 >- [ ] All important data backed up
+>
 >**Documentation**:
 >- [ ] This guide accessible during installation
 >- [ ] Alternative device available for reference
 >
 >If any check fails, resolve the issue before proceeding.
 
-Understanding the Storage Layout
+---
+
+### Understanding the Storage Layout
 
 This guide implements a three-partition layout optimized for security, flexibility, and performance.
-Partition Structure
 
+**Partition Structure**
+
+`
 /dev/nvme0n1
 ├─ nvme0n1p1    ESP (1 GiB, FAT32)
 ├─ nvme0n1p2    LUKS2 → cryptos → LVM (leo-os)
 │                └─ root, var, home, swap, data
 └─ nvme0n1p3    LUKS2 → cryptvms → LVM (leo-vms)
                  └─ vms
+`
 
-Partition Purposes
+**Partition Purposes**
 
-ESP - EFI System Partition (nvme0n1p1)
+**ESP - EFI System Partition (nvme0n1p1)**
 
 Purpose: Stores UEFI bootloader and signed boot components
 
 Technical Details:
-
-    Size: 1 GiB (generous allocation for multiple kernels and fallback images)
-    Filesystem: FAT32 (required by UEFI specification)
-    Mount Point: /boot
-    Contents: systemd-boot bootloader, UKI files, Secure Boot signatures
+- Size: 1 GiB (generous allocation for multiple kernels and fallback images)
+- Filesystem: FAT32 (required by UEFI specification)
+- Mount Point: `/boot`
+- Contents: systemd-boot bootloader, UKI files, Secure Boot signatures
 
 Why This Size: Standard recommendations suggest 512MB, but 1GB provides:
+- Space for multiple kernel versions
+- Room for kernel backups
+- Adequate space for large initramfs images
+- Buffer for future updates
 
-    Space for multiple kernel versions
-    Room for kernel backups
-    Adequate space for large initramfs images
-    Buffer for future updates
-
-System Partition (nvme0n1p2)
+**System Partition (nvme0n1p2)**
 
 Purpose: Encrypted container for entire operating system
 
 Technical Details:
-
-    Encryption: LUKS2 with AES-XTS-256
-    Volume Management: LVM (volume group: leo-os)
-    Contains: Operating system, user data, swap
+- Encryption: LUKS2 with AES-XTS-256
+- Volume Management: LVM (volume group: leo-os)
+- Contains: Operating system, user data, swap
 
 Logical Volumes:
+- `root` (50GB): Core system files
+    - Contains: /, /usr, /lib, /bin, /sbin, /etc
+    - Why 50GB: Accommodates base system, development tools, and growth
 
-    root (50GB): Core system files
-        Contains: /, /usr, /lib, /bin, /sbin, /etc
-        Why 50GB: Accommodates base system, development tools, and growth
+- `var` (30GB): Variable system data
+    - Contains: /var (logs, caches, package databases)
+    - Why 30GB: Prevents log files from filling root, isolates package cache
 
-    var (30GB): Variable system data
-        Contains: /var (logs, caches, package databases)
-        Why 30GB: Prevents log files from filling root, isolates package cache
+- `home` (100GB): User personal data
+    - Contains: /home (user files, configurations, documents)
+    - Why 100GB: Adjust based on your needs, main data storage area
 
-    home (100GB): User personal data
-        Contains: /home (user files, configurations, documents)
-        Why 100GB: Adjust based on your needs, main data storage area
+- `swap` (16GB): Memory overflow and hibernation
+    - Why equal to RAM: Required for hibernation support
+    - Adjust to match your system RAM
 
-    swap (16GB): Memory overflow and hibernation
-        Why equal to RAM: Required for hibernation support
-        Adjust to match your system RAM
-
-    data (remaining): Additional encrypted storage (optional)
-        Purpose: Example of nested encryption for sensitive documents
-        Can be omitted or resized based on needs
+- `data` (remaining): Additional encrypted storage (optional)
+    - Purpose: Example of nested encryption for sensitive documents
+    - Can be omitted or resized based on needs
 
 VM Partition (nvme0n1p3)
 
