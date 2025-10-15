@@ -1,7 +1,6 @@
 ## Table of Contents
 
 1. [Prerequisites and Assumptions](#prerequisites-and-assumptions)
-   - [Hardware Configuration](#hardware-configuration)
    - [System Requirements](#system-requirements)
 
 2. [Network and Time Configuration](#network-and-time-configuration)
@@ -117,17 +116,6 @@
    - [Documentation References](#documentation-references)
 
 ## Prerequisites and Assumptions
-
-### Hardware Configuration
-
-This guide is tailored for:
-- **System**: ASUS ROG Zephyrus G16 (GU605MI)
-- **RAM**: 32GB
-- **GPU**: NVIDIA GeForce RTX 4070 (Mobile)
-- **Storage**: NVMe SSD
-
-> [!note]
-> While this guide uses specific hardware, the principles apply to most modern UEFI systems. Adjust partition sizes, driver selections, and power management settings according to your hardware specifications.
 
 ### System Requirements
 
