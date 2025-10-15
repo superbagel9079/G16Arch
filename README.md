@@ -1,20 +1,16 @@
 # Arch Linux on Asus Zephyrus G16 (GU605MI)
 
-## Target Audience
+> [!NOTE]
+> **Target Audience**: This guide is designed for users who want a secure, maintainable Arch Linux installation with enterprise-grade encryption and modern boot technologies.
 
-Users who want a secure, maintainable Arch Linux installation with enterprise-grade encryption and modern boot technologies.
+> [!TIP]
+> **Hardware Reference**: While optimized for the ASUS ROG Zephyrus G16 (GU605MI), this guide is adaptable to other UEFI systems with appropriate modifications to partition sizes, driver selections, and hardware-specific configurations.
 
-## Hardware Reference
+> [!WARNING]
+> **Data Safety**: Always backup your data before following any installation guide. Verify all commands and device paths before execution to avoid irreversible data loss.
 
-Primary guide is optimized for ASUS ROG Zephyrus G16 (GU605MI) but adaptable to other UEFI systems.
-
-## Warning
-
-Always backup your data before following any installation guide. Verify all commands and paths before execution.
-
-## Documentation Status
-
-Actively maintained and updated for Arch Linux rolling release.
+> [!IMPORTANT]
+> **Documentation Status**: Actively maintained and updated for Arch Linux rolling release. Last verified: 2025-01-14.
 
 ## Table of Contents
 
