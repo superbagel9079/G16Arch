@@ -65,6 +65,7 @@
     - [Generate Initial UKIs](#generate-initial-ukis)
 
 15. [Pacman Hooks: Automated Maintenance Hooks](#pacman-hooks-automated-maintenance-hooks)
+    - [Create the shared rebuild script](#create-the-shared-rebuild-script}
     - [UKI Rebuild and Signing Hook](#uki-rebuild-and-signing-hook)
     - [NVIDIA Driver Update Hook](#nvidia-driver-update-hook)
     - [Systemd-Boot Update Hook](#systemd-boot-update-hook)
@@ -855,6 +856,25 @@ ls -lh /boot/EFI/Linux/
 
 ## Pacman Hooks: Automated Maintenance Hooks
 
+### Create the shared rebuild script:
+
+```bash
+sudo install -Dm0755 /dev/stdin /usr/local/libexec/uki-rebuild-sign.sh <<'EOF'
+#!/usr/bin/env sh
+set -eu
+
+# Rebuild all UKIs and re-sign
+for k in /usr/lib/modules/*/vmlinuz; do
+  [ -e " $ k" ] || continue
+  v=" $ {k%/vmlinuz}"
+  v=" $ {v##*/}"
+  kernel-install add " $ v" "$k"
+done
+
+find /boot/EFI/Linux -type f -name "*.efi" -exec sbctl sign -s {} \;
+EOF
+```
+
 ### UKI Rebuild and Signing Hook
 
 Create `/etc/pacman.d/hooks/90-uki-build-sign.hook`:
@@ -871,19 +891,7 @@ Target = usr/lib/modules/*/vmlinuz
 Description = Rebuilding UKIs via kernel-install and signing with sbctl...
 When = PostTransaction
 Depends = sh
-Exec = /bin/sh -c '
-set -eu
-
-# Rebuild all UKIs and re-sign
-for k in /usr/lib/modules/*/vmlinuz; do
-  [ -e "$k" ] || continue
-  v="${k%/vmlinuz}"
-  v="${v##*/}"
-  kernel-install add "$v" "$k"
-done
-
-find /boot/EFI/Linux -type f -name "*.efi" -exec sbctl sign -s {} \;
-'
+Exec = /usr/local/libexec/uki-rebuild-sign.sh
 EOF
 ```
 
@@ -909,33 +917,12 @@ Description = Rebuilding UKIs due to NVIDIA change (skips if a kernel also chang
 When = PostTransaction
 Depends = sh
 NeedsTargets
-Exec = /bin/sh -c '
-set -eu
-
-# Pacman passes the list of packages that triggered this hook on stdin
-kernel_changed=0
-while read -r trg; do
-  case "$trg" in
-    linux*) kernel_changed=1 ;;
-  esac
-done
-
-# If a kernel changed in this transaction, let 90-uki-build-sign.hook do the work.
-[ "$kernel_changed" -eq 1 ] && exit 0
-
-# Only NVIDIA changed: rebuild all UKIs and re-sign
-for k in /usr/lib/modules/*/vmlinuz; do
-  [ -e "$k" ] || continue
-  v="${k%/vmlinuz}"
-  v="${v##*/}"
-  kernel-install add "$v" "$k"
-done
-
-# Sign all produced UKIs
-find /boot/EFI/Linux -type f -name "*.efi" -exec sbctl sign -s {} \;
-'
+Exec = /usr/local/libexec/uki-rebuild-sign.sh
 EOF
 ```
+
+>[!note]
+>Both hooks call the same script (`uki-rebuild-sign.sh`) to maintain consistency. The script rebuilds all kernel UKIs and signs them with sbctl.
 
 ### Systemd-Boot Update Hook
 
@@ -972,12 +959,7 @@ Description = Signing systemd-boot EFI binary for Secure Boot
 When = PostTransaction
 Depends = sh
 NeedsTargets
-Exec = /bin/sh -c '
-
-while read -r f; do
-  sbctl sign -s -o "${f}.signed" "$f";
-done
-'
+Exec = /bin/sh -c 'while read -r f; do sbctl sign -s -o "${f}.signed" "$f"; done'
 EOF
 ```
 
@@ -1161,6 +1143,11 @@ sbctl enroll-keys --microsoft
 
 # Sign systemd-boot bootloader
 sbctl sign -s -o /usr/lib/systemd/boot/efi/systemd-bootx64.efi.signed /usr/lib/systemd/boot/efi/systemd-bootx64.efi
+
+sbctl sign -s -o /boot/EFI/boot/Bootx64.efi
+
+# Regenerate the initramfs
+pacman -S linux linux-lts
 
 # Verify signing status
 sbctl status
