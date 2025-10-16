@@ -10,6 +10,8 @@ This guide provides post-installation performance optimizations for the ASUS ROG
 > [!TIP]
 > **Quick Start**: If you want tested defaults without deep-diving into configuration details, jump to the Quick Start Configuration section.
 
+---
+
 ## Table of Contents
 
 1. [Understanding Memory Management](#understanding-memory-management)
