@@ -146,6 +146,20 @@ ip addr add <ADDRESS/CIDR> dev <IFACE>
 ip route add default via <GATEWAY> dev <IFACE>
 ```
 
+**For WiFi**:
+
+```bash
+iwctl
+
+# Inside iwctl prompt:
+device list
+station <DEVICE> scan
+station <DEVICE> get-networks
+station <DEVICE> connect "<SSID>"
+# Enter password when prompted
+exit
+```
+
 > [!tip] 
 > Test connectivity with `ping -c 3 archlinux.org` before proceeding.
 
