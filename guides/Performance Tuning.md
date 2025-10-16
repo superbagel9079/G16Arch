@@ -139,8 +139,9 @@ EOF
 >[!NOTE]
 >**Size Calculation**: The 20GB allocation provides comfortable headroom for typical workloads. With zstd compression averaging 2.5-3x, this effectively provides 50-60GB of swap space.
 
-Alternative Compression Algorithms:
+**Alternative Compression Algorithms**:
 
+```bash
 # For maximum compression (slower CPU):
 compression-algorithm = zstd
 
@@ -149,13 +150,17 @@ compression-algorithm = lz4
 
 # For balanced performance:
 compression-algorithm = lzo
+```
 
-Activate Zram:
+**Activate Zram**:
 
+```bash
 sudo systemctl daemon-reload
 sudo systemctl start systemd-zram-setup@zram0.service
 sudo systemctl enable systemd-zram-setup@zram0.service
+```
 
+```bash
 Verify Configuration:
 
 # Check zram device
@@ -172,18 +177,19 @@ swapon --show
 # NAME       TYPE      SIZE USED PRIO
 # /dev/zram0 partition  20G   0B  100
 # /dev/dm-X  partition  XG    0B   10
+```
 
 Swap Priority and Hibernation
 
-Purpose: Configure swap device priorities to prefer zram while maintaining hibernation capability.
+**Purpose**: Configure swap device priorities to prefer zram while maintaining hibernation capability.
 
-Background: Linux uses swap devices in priority order. Higher priority values are used first. Our configuration:
+**Background**: Linux uses swap devices in priority order. Higher priority values are used first. Our configuration:
+- Zram: Priority 100 (primary swap)
+- Disk swap: Priority 10 (hibernation and overflow)
 
-    Zram: Priority 100 (primary swap)
-    Disk swap: Priority 10 (hibernation and overflow)
+**Modify Disk Swap Entry**:
 
-Modify Disk Swap Entry:
-
+```bash
 # Backup fstab
 sudo cp /etc/fstab /etc/fstab.backup
 
@@ -196,9 +202,11 @@ sudo sed -i 's/$ .*swap.*defaults $ /\1,pri=10/' /etc/fstab
 # Verify modification
 grep swap /etc/fstab
 # Expected: /dev/mapper/leo--os-swap none swap defaults,pri=10 0 0
+```
 
-    [!WARNING]
-    Hibernation Requirement: Disk swap must remain enabled and be at least equal to your RAM size (32GB) for hibernation to work. Do not disable disk swap if you use systemctl hibernate.
+>[!WARNING]
+>**Hibernation Requirement**: Disk swap must remain enabled and be at least equal to your RAM size (32GB) for hibernation to work.
+>Do not disable disk swap if you use systemctl hibernate.
 
 Reactivate Swap:
 
