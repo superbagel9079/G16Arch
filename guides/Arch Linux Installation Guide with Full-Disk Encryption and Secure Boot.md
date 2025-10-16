@@ -65,7 +65,7 @@
     - [Generate Initial UKIs](#generate-initial-ukis)
 
 15. [Pacman Hooks: Automated Maintenance Hooks](#pacman-hooks-automated-maintenance-hooks)
-    - [Create the shared rebuild script](#create-the-shared-rebuild-script}
+    - [Create the shared rebuild script](#create-the-shared-rebuild-script)
     - [UKI Rebuild and Signing Hook](#uki-rebuild-and-signing-hook)
     - [NVIDIA Driver Update Hook](#nvidia-driver-update-hook)
     - [Systemd-Boot Update Hook](#systemd-boot-update-hook)
