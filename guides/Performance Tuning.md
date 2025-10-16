@@ -1,5 +1,7 @@
 # Performance Tuning Guide
 
+---
+
 ## Overview
 
 This guide provides post-installation performance optimizations for the ASUS ROG Zephyrus G16 (GU605MI) with 32GB RAM and RTX 4070. These configurations enhance system responsiveness, reduce disk wear on SSDs, and optimize memory management.
@@ -9,6 +11,8 @@ This guide provides post-installation performance optimizations for the ASUS ROG
 
 > [!TIP]
 > **Quick Start**: If you want tested defaults without deep-diving into configuration details, jump to the Quick Start Configuration section.
+
+---
 
 ## Table of Contents
 
@@ -55,6 +59,8 @@ Before configuring, understand these core concepts:
 
 > [!IMPORTANT]
 > **Hibernation Compatibility**: This guide maintains hibernation support by keeping disk swap active at lower priority. If you don't use hibernation, you can disable disk swap entirely after verifying zram stability.
+
+---
 
 ## Essential Optimizations
 
@@ -126,7 +132,7 @@ swapon --show
 # /dev/dm-X  partition  XG    0B   10
 ```
 
-Swap Priority and Hibernation
+### Swap Priority and Hibernation
 
 **Purpose**: Configure swap device priorities to prefer zram while maintaining hibernation capability.
 
@@ -155,8 +161,9 @@ grep swap /etc/fstab
 >**Hibernation Requirement**: Disk swap must remain enabled and be at least equal to your RAM size (32GB) for hibernation to work.
 >Do not disable disk swap if you use systemctl hibernate.
 
-Reactivate Swap:
+**Reactivate Swap**:
 
+```bash
 # Turn off all swap
 sudo swapoff -a
 
@@ -165,33 +172,39 @@ sudo swapon -a
 
 # Verify priorities
 swapon --show
+```
 
-Tmpfs Configuration
+### Tmpfs Configuration
 
-Purpose: Configure /tmp with explicit limits and security options to prevent memory exhaustion.
+**Purpose**: Configure `/tmp` with explicit limits and security options to prevent memory exhaustion.
 
-Default Behavior: Systemd mounts /tmp as tmpfs with 50% RAM allocation (16GB on your system). This is usually sufficient but lacks security hardening.
+**Default Behavior**: Systemd mounts `/tmp` as tmpfs with 50% RAM allocation (16GB on your system). This is usually sufficient but lacks security hardening.
 
-Recommended Configuration:
+**Recommended Configuration**:
 
-Add this line to /etc/fstab:
+Add this line to `/etc/fstab`:
 
+```
 tmpfs /tmp tmpfs mode=1777,strictatime,noexec,nosuid,nodev,size=4G 0 0
+```
 
-Mount Option Explanation:
-Option 	Purpose
-mode=1777 	Preserves sticky bit (only file owner can delete)
-strictatime 	Updates access times (filesystem consistency)
-noexec 	Prevents execution of binaries from /tmp (security)
-nosuid 	Ignores setuid/setgid bits (security)
-nodev 	Prevents device file creation (security)
-size=4G 	Maximum allocation (demand-allocated, not reserved)
+**Mount Option Explanation**:
 
-    [!NOTE]
-    Memory Allocation: The size=4G is a ceiling, not a reservation. Tmpfs only consumes RAM for actual file content. Empty /tmp uses negligible memory.
+| Option | Purpose |
+| --- | --- |
+| `mode=1777` | Preserves sticky bit (only file owner can delete) |
+| `strictatime` | Updates access times (filesystem consistency) |
+| `noexec` | Prevents execution of binaries from `/tmp` (security) |
+| `nosuid` | Ignores setuid/setgid bits (security) |
+| `nodev` | Prevents device file creation (security) |
+| `size=4G` | Maximum allocation (demand-allocated, not reserved) |
 
-Apply Configuration:
+>[!NOTE]
+>**Memory Allocation**: The `size=4G` is a ceiling, not a reservation. Tmpfs only consumes RAM for actual file content. Empty `/tmp` uses negligible memory.
 
+**Apply Configuration**:
+
+```bash
 # Remount with new options
 sudo mount -o remount /tmp
 
@@ -200,17 +213,22 @@ mount | grep /tmp
 
 # Expected output:
 # tmpfs on /tmp type tmpfs (rw,nosuid,nodev,noexec,relatime,size=4194304k)
+```
 
-    [!TIP]
-    Size Tuning: If you compile large projects in /tmp or use RAM-intensive applications, increase to size=8G. For minimal systems, size=2G suffices.
+>[!TIP]
+>**Size Tuning**: If you compile large projects in `/tmp` or use RAM-intensive applications, increase to `size=8G`. For minimal systems, `size=2G` suffices.
 
-Optional Optimizations
-Advanced Sysctl Tuning
+---
 
-Purpose: Fine-tune kernel memory management behavior for responsive performance with zram.
+## Optional Optimizations
 
-Configuration File: /etc/sysctl.d/99-zram.conf
+### Advanced Sysctl Tuning
 
+**Purpose**: Fine-tune kernel memory management behavior for responsive performance with zram.
+
+**Configuration File**: `/etc/sysctl.d/99-zram.conf`
+
+```bash
 sudo tee /etc/sysctl.d/99-zram.conf > /dev/null <<'EOF'
 # Aggressive swapping to zram (fast compressed RAM)
 vm.swappiness = 100
@@ -218,36 +236,38 @@ vm.swappiness = 100
 # Disable swap readahead (inefficient with compression)
 vm.page-cluster = 0
 EOF
+```
 
-Parameter Explanation:
+**Parameter Explanation**:
 
-vm.swappiness = 100
+**vm.swappiness = 100**
+- Controls how aggressively kernel swaps memory to swap space
+- Range: 0-200 (default: 60)
+- Value 100: Treat swap and RAM equally
+- Rationale: Since zram is compressed RAM (fast), aggressive swapping increases effective memory capacity without performance penalty
 
-    Controls how aggressively kernel swaps memory to swap space
-    Range: 0-200 (default: 60)
-    Value 100: Treat swap and RAM equally
-    Rationale: Since zram is compressed RAM (fast), aggressive swapping increases effective memory capacity without performance penalty
+**vm.page-cluster = 0**
+- Controls swap readahead page count
+- Range: 0-8 (default: 3, reads 2^3 = 8 pages ahead)
+- Value 0: Disable readahead
+- Rationale: Readahead optimizes disk seeks but adds overhead with zram compression. Disable for zram-primary configurations.
 
-vm.page-cluster = 0
+>[!IMPORTANT]
+>**Use Case Specific**: These aggressive settings benefit zram configurations. If you primarily use disk swap, revert to conservative values: `vm.swappiness=10` and `vm.page-cluster=3`.
 
-    Controls swap readahead page count
-    Range: 0-8 (default: 3, reads 2^3 = 8 pages ahead)
-    Value 0: Disable readahead
-    Rationale: Readahead optimizes disk seeks but adds overhead with zram compression. Disable for zram-primary configurations.
+**Apply Sysctl Configuration**:
 
-    [!IMPORTANT]
-    Use Case Specific: These aggressive settings benefit zram configurations. If you primarily use disk swap, revert to conservative values: vm.swappiness=10 and vm.page-cluster=3.
-
-Apply Sysctl Configuration:
-
+```bash
 sudo sysctl -p /etc/sysctl.d/99-zram.conf
 
 # Verify active values
 sysctl vm.swappiness
 sysctl vm.page-cluster
+```
 
-Alternative Profiles:
+**Alternative Profiles**:
 
+```bash
 # Conservative (prefer RAM, minimal swap):
 vm.swappiness = 10
 vm.page-cluster = 3
@@ -259,16 +279,18 @@ vm.page-cluster = 3
 # Aggressive for zram (current recommendation):
 vm.swappiness = 100
 vm.page-cluster = 0
+```
 
-SSD Optimization
+### SSD Optimization
 
-Purpose: Reduce write amplification and extend SSD lifespan with periodic TRIM operations.
+**Purpose**: Reduce write amplification and extend SSD lifespan with periodic TRIM operations.
 
-    [!NOTE]
-    Already Configured: If you followed the Installation Guide Section 17, fstrim.timer is already enabled. This section is for verification and troubleshooting.
+>[!NOTE]
+>**Already Configured**: If you followed the Installation Guide Section 17, fstrim.timer is already enabled. This section is for verification and troubleshooting.
 
-Verify TRIM Support:
+**Verify TRIM Support**:
 
+```bash
 # Check device TRIM capabilities
 lsblk --discard
 
@@ -276,9 +298,11 @@ lsblk --discard
 # Expected output for NVMe SSD:
 # NAME        DISC-GRAN DISC-MAX
 # nvme0n1           512B       2G
+```
 
-Check TRIM Timer Status:
+**Check TRIM Timer Status**:
 
+```bash
 # Verify timer is active
 systemctl status fstrim.timer
 
@@ -287,9 +311,11 @@ systemctl list-timers fstrim.timer
 
 # View execution history
 journalctl -u fstrim.service
+```
 
-Manual TRIM Execution (for testing):
+**Manual TRIM Execution (for testing)**:
 
+```bash
 # Run TRIM on all mounted filesystems
 sudo fstrim -av
 
@@ -297,16 +323,18 @@ sudo fstrim -av
 # /boot: 800 MiB (838860800 bytes) trimmed on /dev/nvme0n1p1
 # /: 45 GiB (48318382080 bytes) trimmed on /dev/dm-1
 # /home: 180 GiB (193273528320 bytes) trimmed on /dev/dm-3
+```
 
-    [!WARNING]
-    Continuous TRIM: The Installation Guide uses fstrim.timer (periodic TRIM) instead of discard mount option (continuous TRIM) because periodic TRIM is more reliable and reduces write overhead.
+>[!WARNING]
+>**Continuous TRIM**: The Installation Guide uses `fstrim.timer` (periodic TRIM) instead of `discard` mount option (continuous TRIM) because periodic TRIM is more reliable and reduces write overhead.
 
-NVIDIA Power Management
+### NVIDIA Power Management
 
-Purpose: Optimize power consumption on laptops with NVIDIA Optimus graphics.
+**Purpose**: Optimize power consumption on laptops with NVIDIA Optimus graphics.
 
-Check Available Power Profiles:
+**Check Available Power Profiles**:
 
+```bash
 # List profiles
 powerprofilesctl list
 
@@ -319,9 +347,11 @@ powerprofilesctl list
 # 
 #   power-saver:
 #     Driver:     placeholder
+```
 
-Set Power Profile:
+**Set Power Profile**:
 
+```bash
 # For battery life (recommended on battery):
 powerprofilesctl set power-saver
 
@@ -333,27 +363,32 @@ powerprofilesctl set balanced
 
 # Check current profile:
 powerprofilesctl get
+```
 
-Automatic Profile Switching:
+**Automatic Profile Switching**:
 
-The power-profiles-daemon (enabled in Installation Guide Section 17) automatically switches profiles based on power source. No additional configuration needed.
+The `power-profiles-daemon` (enabled in Installation Guide Section 17) automatically switches profiles based on power source. No additional configuration needed.
 
-Verify NVIDIA Power State:
+**Verify NVIDIA Power State**:
 
+```bash
 # Check NVIDIA GPU status
 nvidia-smi
 
 # Monitor power consumption
 watch -n 1 nvidia-smi --query-gpu=power.draw --format=csv
+```
 
-    [!TIP]
-    Prime Offload: For Optimus laptops, use prime-run <application> to explicitly run applications on NVIDIA GPU. Most applications use Intel integrated graphics by default for power savings.
+>[!TIP]
+>**Prime Offload**: For Optimus laptops, use `prime-run <application>` to explicitly run applications on NVIDIA GPU. Most applications use Intel integrated graphics by default for power savings.
 
-Verification and Monitoring
-Comprehensive System Check
+## Verification and Monitoring
+
+**Comprehensive System Check**
 
 Execute these commands after applying configurations:
 
+```bash
 # 1. Verify zram is active and being used
 echo "=== Zram Status ==="
 zramctl
@@ -395,19 +430,23 @@ systemctl status fstrim.timer --no-pager
 # 8. Check swap usage over time
 echo -e "\n=== Swap Usage ==="
 watch -n 5 'free -h && echo "" && swapon --show'
+```
 
-Performance Monitoring Commands
+### Performance Monitoring Commands
 
-Real-time Memory Monitoring:
+**Real-time Memory Monitoring**:
 
+```bash
 # Continuous memory and swap monitoring
 watch -n 1 'free -h; echo ""; swapon --show'
 
 # Detailed zram statistics
 watch -n 1 'zramctl; echo ""; cat /sys/block/zram0/mm_stat'
+```
 
-Historical Analysis:
+**Historical Analysis**:
 
+```bash
 # System resource usage over time (requires sysstat package)
 sudo pacman -S sysstat
 sudo systemctl enable --now sysstat
@@ -417,47 +456,52 @@ sar -r 1 10  # 10 samples at 1-second intervals
 
 # View swap activity
 sar -S 1 10
+```
 
-Disk I/O Monitoring (verify reduced swap writes):
+**Disk I/O Monitoring** (verify reduced swap writes):
 
+```bash
 # Monitor disk writes (should see minimal swap partition writes)
 sudo iotop -o
 
 # Check disk write statistics
 iostat -x 2  # Update every 2 seconds
+```
 
-Expected Outcomes
+### Expected Outcomes
 
 After successful configuration, you should observe:
 
-Memory Efficiency:
+**Memory Efficiency**:
+- Compression ratio: 2.5-3.0x with zstd
+- Effective swap capacity: ~50-60GB from 20GB zram
+- Minimal disk swap usage unless memory pressure is extreme
 
-    Compression ratio: 2.5-3.0x with zstd
-    Effective swap capacity: ~50-60GB from 20GB zram
-    Minimal disk swap usage unless memory pressure is extreme
+**Performance Indicators**:
+- Faster application switching (no disk swap delays)
+- Reduced SSD write operations (verify with iostat)
+- Consistent system responsiveness under memory pressure
 
-Performance Indicators:
+**Swap Priority Verification**:
 
-    Faster application switching (no disk swap delays)
-    Reduced SSD write operations (verify with iostat)
-    Consistent system responsiveness under memory pressure
-
-Swap Priority Verification:
-
+```bash
 swapon --show
 # Expected output:
 # NAME           TYPE      SIZE   USED PRIO
 # /dev/zram0     partition  20G    2G  100  <- Used first
 # /dev/dm-3      partition  32G    0B   10  <- Hibernation backup
+```
 
-    [!TIP]
-    Baseline Testing: Before applying optimizations, run sysbench or similar benchmarks to establish baseline performance. Compare after configuration to quantify improvements.
+>[!TIP]
+>**Baseline Testing**: Before applying optimizations, run `sysbench` or similar benchmarks to establish baseline performance. Compare after configuration to quantify improvements.
 
-Rollback Procedures
+## Rollback Procedures
 
 If you experience issues or want to revert to default configuration:
-Complete Rollback
 
+### Complete Rollback
+
+```bash
 # 1. Stop and disable zram
 sudo systemctl stop systemd-zram-setup@zram0.service
 sudo systemctl disable systemd-zram-setup@zram0.service
@@ -485,9 +529,11 @@ sysctl vm.swappiness vm.page-cluster
 
 # 8. Reboot to ensure clean state
 sudo reboot
+```
 
-Partial Rollback (Keep Zram, Revert Tuning)
+### Partial Rollback (Keep Zram, Revert Tuning)
 
+```bash
 # Revert to conservative swappiness while keeping zram
 sudo tee /etc/sysctl.d/99-zram.conf > /dev/null <<'EOF'
 vm.swappiness = 10
@@ -495,34 +541,41 @@ vm.page-cluster = 3
 EOF
 
 sudo sysctl -p /etc/sysctl.d/99-zram.conf
+```
 
-Rollback Tmpfs Only
+### Rollback Tmpfs Only
 
+```bash
 # Remove custom tmpfs entry from fstab
 sudo sed -i '/tmpfs.*\/tmp/d' /etc/fstab
 
 # Remount with systemd defaults
 sudo systemctl daemon-reload
 sudo mount -o remount /tmp
+```
 
-    [!IMPORTANT]
-    Backup Reminder: Always keep /etc/fstab.backup until you verify new configuration works across multiple reboots. Delete old backups after confirming stability.
+>[!IMPORTANT]
+>**Backup Reminder**: Always keep `/etc/fstab.backup` until you verify new configuration works across multiple reboots. Delete old backups after confirming stability.
 
-Troubleshooting
-High Memory Usage After Configuration
+## Troubleshooting
 
-Symptom: System uses more swap than expected with zram enabled.
+### High Memory Usage After Configuration
 
-Diagnosis:
+**Symptom**: System uses more swap than expected with zram enabled.
 
+**Diagnosis**:
+
+```bash
 # Check what's consuming zram
 sudo zramctl --output-all
 
 # Identify memory-heavy processes
 ps aux --sort=-%mem | head -20
+```
 
-Solutions:
+**Solutions**:
 
+```bash
 # Reduce swappiness to be less aggressive
 sudo sysctl vm.swappiness=60
 
@@ -532,15 +585,17 @@ zram-size = 24576
 EOF
 
 sudo systemctl restart systemd-zram-setup@zram0.service
+```
 
-System Freeze Under Memory Pressure
+### System Freeze Under Memory Pressure
 
-Symptom: System becomes unresponsive when memory is exhausted.
+**Symptom**: System becomes unresponsive when memory is exhausted.
 
-Cause: Over-aggressive swapping with insufficient zram capacity.
+**Cause**: Over-aggressive swapping with insufficient zram capacity.
 
-Solutions:
+**Solutions**:
 
+```bash
 # Reduce swappiness to prevent excessive swapping
 sudo sysctl vm.swappiness=40
 
@@ -561,13 +616,15 @@ WantedBy=multi-user.target
 EOF
 
 sudo systemctl enable --now low-memory-monitor.service
+```
 
-Hibernation Fails
+### Hibernation Fails
 
-Symptom: systemctl hibernate fails or system doesn't resume properly.
+**Symptom**: `systemctl hibernate` fails or system doesn't resume properly.
 
-Diagnosis:
+**Diagnosis**:
 
+```bash
 # Verify resume parameter in kernel cmdline
 cat /proc/cmdline | grep resume
 
@@ -577,9 +634,12 @@ swapon --show | grep dm
 
 # Test hibernation manually
 sudo systemctl hibernate
+```
 
-Solutions:
+**Solutions**:
 
+
+```bash
 # Ensure disk swap has higher capacity than RAM
 # Resize swap LV if needed (requires reinstall or complex resize)
 
@@ -591,21 +651,25 @@ grep swap /etc/fstab
 # Expected: /dev/mapper/leo--os-swap none swap defaults,pri=10 0 0
 
 # Rebuild initramfs to include resume hook (already done in Installation Guide)
+```
 
-Zram Not Activating on Boot
+### Zram Not Activating on Boot
 
-Symptom: After reboot, zramctl shows no devices.
+**Symptom**: After reboot, `zramctl` shows no devices.
 
-Diagnosis:
+**Diagnosis**:
 
+```bash
 # Check service status
 systemctl status systemd-zram-setup@zram0.service
 
 # View service logs
 journalctl -u systemd-zram-setup@zram0.service
+```
 
-Solutions:
+**Solutions**:
 
+```bash
 # Verify configuration file exists and is valid
 cat /etc/systemd/zram-generator.conf
 
@@ -617,21 +681,25 @@ sudo systemctl enable systemd-zram-setup@zram0.service
 
 # Test activation
 sudo systemctl start systemd-zram-setup@zram0.service
+```
 
-Poor Zram Compression Ratio
+### Poor Zram Compression Ratio
 
-Symptom: Compression ratio below 2.0x, indicating inefficient memory use.
+**Symptom**: Compression ratio below 2.0x, indicating inefficient memory use.
 
-Diagnosis:
+**Diagnosis**:
 
+```bash
 # Check current compression ratio
 awk '{printf "Compression Ratio: %.2fx\n",  $ 1/ $ 2}' /sys/block/zram0/mm_stat
 
 # Verify compression algorithm
 zramctl | grep ALGORITHM
+```
 
-Solutions:
+**Solutions**:
 
+```bash
 # Try different compression algorithm
 sudo tee /etc/systemd/zram-generator.conf > /dev/null <<'EOF'
 [zram0]
@@ -646,22 +714,26 @@ sudo systemctl restart systemd-zram-setup@zram0.service
 # zstd: Best ratio (~2.5-3x), moderate CPU
 # lzo: Balanced ratio (~2.2x), lower CPU
 # lz4: Fast compression (~2x), lowest CPU
+```
 
-Excessive CPU Usage from Compression
+### Excessive CPU Usage from Compression
 
-Symptom: High CPU load attributed to zram compression/decompression.
+**Symptom**: High CPU load attributed to zram compression/decompression.
 
-Diagnosis:
+**Diagnosis**:
 
+```bash
 # Monitor CPU usage
 top
 # Look for [zswap] or compression-related kernel threads
 
 # Check zram statistics
 cat /sys/block/zram0/io_stat
+```
 
-Solutions:
+**Solutions**:
 
+```bash
 # Switch to faster compression algorithm
 sudo tee /etc/systemd/zram-generator.conf > /dev/null <<'EOF'
 [zram0]
@@ -679,21 +751,25 @@ swap-priority = 100
 EOF
 
 sudo systemctl restart systemd-zram-setup@zram0.service
+```
 
-Tmpfs Filling Up /tmp
+### Tmpfs Filling Up /tmp
 
-Symptom: Applications fail with "No space left on device" errors for /tmp.
+**Symptom**: Applications fail with "No space left on device" errors for `/tmp`.
 
-Diagnosis:
+**Diagnosis**:
 
+```bash
 # Check /tmp usage
 df -h /tmp
 
 # Identify large files
 sudo du -sh /tmp/* | sort -h
+```
 
-Solutions:
+**Solutions**:
 
+```bash
 # Increase tmpfs size
 sudo sed -i 's/size=[0-9]*G/size=8G/' /etc/fstab
 
@@ -707,6 +783,6 @@ df -h /tmp
 sudo sed -i '/tmpfs.*\/tmp/d' /etc/fstab
 sudo systemctl daemon-reload
 sudo reboot
-
-    [!TIP]
-    Log Monitoring: Keep an eye on system logs for memory-related warnings: journalctl -p warning -b | grep -i mem
+```
+>[!TIP]
+>**Log Monitoring**: Keep an eye on system logs for memory-related warnings: `journalctl -p warning -b | grep -i mem`
