@@ -13,18 +13,17 @@ This guide provides post-installation performance optimizations for the ASUS ROG
 ## Table of Contents
 
 1. [Understanding Memory Management](#understanding-memory-management)
-2. [Quick Start Configuration](#quick-start-configuration)
-3. [Essential Optimizations](#essential-optimizations)
+2. [Essential Optimizations](#essential-optimizations)
    - [Zram Configuration](#zram-configuration)
    - [Swap Priority and Hibernation](#swap-priority-and-hibernation)
    - [Tmpfs Configuration](#tmpfs-configuration)
-4. [Optional Optimizations](#optional-optimizations)
+3. [Optional Optimizations](#optional-optimizations)
    - [Advanced Sysctl Tuning](#advanced-sysctl-tuning)
    - [SSD Optimization](#ssd-optimization)
    - [NVIDIA Power Management](#nvidia-power-management)
-5. [Verification and Monitoring](#verification-and-monitoring)
-6. [Rollback Procedures](#rollback-procedures)
-7. [Troubleshooting](#troubleshooting)
+4. [Verification and Monitoring](#verification-and-monitoring)
+5. [Rollback Procedures](#rollback-procedures)
+6. [Troubleshooting](#troubleshooting)
 
 ## Understanding Memory Management
 
@@ -56,58 +55,6 @@ Before configuring, understand these core concepts:
 
 > [!IMPORTANT]
 > **Hibernation Compatibility**: This guide maintains hibernation support by keeping disk swap active at lower priority. If you don't use hibernation, you can disable disk swap entirely after verifying zram stability.
-
-## Quick Start Configuration
-
-For users who want optimized defaults without customization, execute these commands in sequence:
-
-```bash
-# 1. Disable zswap (if not already in kernel cmdline)
-# Check current status:
-cat /proc/cmdline | grep zswap
-
-# If not present, add to kernel cmdline (already done in Installation Guide Section 13)
-# Otherwise, verify: zswap.enabled=0
-
-# 2. Configure zram
-sudo tee /etc/systemd/zram-generator.conf > /dev/null <<'EOF'
-[zram0]
-zram-size = 20480
-compression-algorithm = zstd
-swap-priority = 100
-fs-type = swap
-EOF
-
-# 3. Adjust disk swap priority for hibernation compatibility
-sudo cp /etc/fstab /etc/fstab.backup
-sudo sed -i 's/$ .*swap.*defaults $ /\1,pri=10/' /etc/fstab
-
-# Verify the change:
-grep swap /etc/fstab
-
-# 4. Configure tmpfs limits
-sudo tee -a /etc/fstab > /dev/null <<'EOF'
-tmpfs /tmp tmpfs mode=1777,strictatime,noexec,nosuid,nodev,size=4G 0 0
-EOF
-
-# 5. Set conservative swappiness
-sudo tee /etc/sysctl.d/99-zram.conf > /dev/null <<'EOF'
-vm.swappiness = 100
-vm.page-cluster = 0
-EOF
-
-# 6. Apply configurations
-sudo sysctl -p /etc/sysctl.d/99-zram.conf
-sudo systemctl daemon-reload
-sudo systemctl start systemd-zram-setup@zram0.service
-
-# 7. Verify everything is working
-swapon --show
-zramctl
-free -h
-```
->[!TIP]
->**Reboot Recommended**: While these changes activate immediately, reboot to ensure all configurations persist across boot cycles: `sudo reboot`
 
 ## Essential Optimizations
 
@@ -160,9 +107,9 @@ sudo systemctl start systemd-zram-setup@zram0.service
 sudo systemctl enable systemd-zram-setup@zram0.service
 ```
 
-```bash
-Verify Configuration:
+**Verify Configuration**:
 
+```bash
 # Check zram device
 zramctl
 
