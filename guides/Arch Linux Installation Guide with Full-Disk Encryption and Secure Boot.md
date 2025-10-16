@@ -60,7 +60,6 @@
 14. [Unified Kernel Image Setup](#unified-kernel-image-setup)
     - [Install Systemd-Boot](#install-systemd-boot)
     - [Configure Kernel-Install](#configure-kernel-install)
-    - [Configure UKI Generator](#configure-uki-generator)
     - [Configure Systemd-Boot](#configure-systemd-boot)
     - [Generate Initial UKIs](#generate-initial-ukis)
 
@@ -486,7 +485,7 @@ pacstrap -K /mnt \
   base base-devel linux linux-firmware linux-lts intel-ucode \
   busybox e2fsprogs xfsprogs cryptsetup lvm2 networkmanager \
   vim nano man-db man-pages texinfo \
-  dracut systemd-ukify dracut-ukify \
+  dracut systemd-ukify \
   sbctl \
   nvidia nvidia-lts nvidia-utils nvidia-prime \
   power-profiles-daemon
@@ -796,19 +795,6 @@ uki_generator=ukify
 EOF
 ```
 
-### Configure UKI Generator
-
-Create `/etc/kernel/uki.conf`:
-
-```bash
-cat > /etc/kernel/uki.conf <<'EOF'
-[UKI]
-ESPPath=/boot
-OutputDir=EFI/Linux
-CmdlineFile=/etc/kernel/cmdline
-EOF
-```
-
 ### Configure Systemd-Boot
 
 Create `/boot/loader/loader.conf`:
@@ -817,7 +803,7 @@ Create `/boot/loader/loader.conf`:
 cat > /boot/loader/loader.conf <<'EOF'
 default @saved
 auto-firmware no
-timeout 3
+timeout 10
 console-mode max
 editor no
 EOF
