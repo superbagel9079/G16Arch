@@ -109,13 +109,15 @@ free -h
 >[!TIP]
 >**Reboot Recommended**: While these changes activate immediately, reboot to ensure all configurations persist across boot cycles: `sudo reboot`
 
-Essential Optimizations
-Zram Configuration
+## Essential Optimizations
 
-Purpose: Primary swap device using compressed RAM for better performance and reduced SSD wear.
+### Zram Configuration
 
-Configuration File: /etc/systemd/zram-generator.conf
+**Purpose**: Primary swap device using compressed RAM for better performance and reduced SSD wear.
 
+**Configuration File**: `/etc/systemd/zram-generator.conf`
+
+```bash
 sudo tee /etc/systemd/zram-generator.conf > /dev/null <<'EOF'
 [zram0]
 zram-size = 20480
@@ -123,16 +125,19 @@ compression-algorithm = zstd
 swap-priority = 100
 fs-type = swap
 EOF
+```
 
-Parameter Explanation:
-Parameter 	Value 	Reasoning
-zram-size 	20480 (20GB) 	~62% of 32GB RAM - balanced capacity without over-commitment
-compression-algorithm 	zstd 	Best balance of compression ratio (2.5-3x) and speed
-swap-priority 	100 	Higher than disk swap (10) to prefer zram
-fs-type 	swap 	Explicitly declare as swap device
+**Parameter Explanation**:
 
-    [!NOTE]
-    Size Calculation: The 20GB allocation provides comfortable headroom for typical workloads. With zstd compression averaging 2.5-3x, this effectively provides 50-60GB of swap space.
+| Parameter | Value | Reasoning |
+| --- | --- | --- |
+| zram-size | 20480 (20GB) | ~62% of 32GB RAM - balanced capacity without over-commitment |
+| compression-algorithm | zstd | Best balance of compression ratio (2.5-3x) and speed |
+| swap-priority | 100 | Higher than disk swap (10) to prefer zram |
+| fs-type | swap | Explicitly declare as swap device |
+
+>[!NOTE]
+>**Size Calculation**: The 20GB allocation provides comfortable headroom for typical workloads. With zstd compression averaging 2.5-3x, this effectively provides 50-60GB of swap space.
 
 Alternative Compression Algorithms:
 
