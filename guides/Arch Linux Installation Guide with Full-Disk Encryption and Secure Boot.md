@@ -469,7 +469,7 @@ swapon /dev/mapper/leo--os-swap
 ```bash
 pacstrap -K /mnt \
   base base-devel linux linux-firmware linux-lts intel-ucode \
-  busybox e2fsprogs xfsprogs zram-generator cryptsetup lvm2 networkmanager \
+  busybox e2fsprogs xfsprogs cryptsetup lvm2 networkmanager \
   vim nano man-db man-pages texinfo \
   dracut systemd-ukify dracut-ukify \
   sbctl \
