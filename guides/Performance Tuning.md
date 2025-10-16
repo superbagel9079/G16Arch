@@ -10,8 +10,6 @@ This guide provides post-installation performance optimizations for the ASUS ROG
 > [!TIP]
 > **Quick Start**: If you want tested defaults without deep-diving into configuration details, jump to the Quick Start Configuration section.
 
----
-
 ## Table of Contents
 
 1. [Understanding Memory Management](#understanding-memory-management)
@@ -107,9 +105,9 @@ sudo systemctl start systemd-zram-setup@zram0.service
 swapon --show
 zramctl
 free -h
-
-    [!TIP]
-    Reboot Recommended: While these changes activate immediately, reboot to ensure all configurations persist across boot cycles: sudo reboot
+```
+>[!TIP]
+>**Reboot Recommended**: While these changes activate immediately, reboot to ensure all configurations persist across boot cycles: `sudo reboot`
 
 Essential Optimizations
 Zram Configuration
