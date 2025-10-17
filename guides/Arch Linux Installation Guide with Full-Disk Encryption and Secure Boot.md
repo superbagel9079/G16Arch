@@ -865,6 +865,10 @@ Operation = Install
 Operation = Upgrade
 Type = Path
 Target = usr/lib/modules/*/vmlinuz
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
 Type = Package
 Target = nvidia
 Target = nvidia-lts
@@ -1106,6 +1110,21 @@ sbctl status
 # Update bootloader
 bootctl update
 bootctl list
+
+# If you do not see Windows
+
+# create temporary mount-point
+mkdir -p /mnt/win-esp
+
+# mount Windows ESP (replace /dev/sdXY with the real partition)
+mount /dev/sdXY /mnt/win-esp
+
+# Copy the whole directory if you want every Windows loader tool
+cp -a /mnt/win-esp/EFI/Microsoft /boot/EFI/
+
+# clean up
+umount /mnt/win-esp
+rmdir  /mnt/win-esp
 ```
 
 > [!important] 
