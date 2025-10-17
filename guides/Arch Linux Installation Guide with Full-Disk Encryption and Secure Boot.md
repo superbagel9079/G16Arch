@@ -483,7 +483,7 @@ swapon /dev/mapper/leo--os-swap
 ```bash
 pacstrap -K /mnt \
   base base-devel linux linux-firmware linux-lts intel-ucode \
-  busybox e2fsprogs xfsprogs cryptsetup lvm2 networkmanager iwd \
+  busybox e2fsprogs xfsprogs cryptsetup lvm2 util-linux networkmanager iwd \
   vim nano man-db man-pages texinfo \
   dracut systemd-ukify \
   sbctl \
@@ -621,7 +621,7 @@ add_drivers+=" nvme xhci_pci i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm "
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/90-omit.conf <<'EOF'
-omit_dracutmodules+=" dracut-systemd network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs zram dmsquash-live livenet plymouth "
+omit_dracutmodules+=" network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs zram dmsquash-live livenet plymouth "
 EOF
 ```
 
@@ -747,7 +747,7 @@ Create `/etc/kernel/cmdline`:
 
 ```bash
 cat > /etc/kernel/cmdline <<EOF
-root=/dev/mapper/leo--os-root rd.luks.name=${SYSUUID}=cryptos rd.luks.options=cryptos=password-echo=no,discard=0,timeout=10s,tries=3 rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap resume=/dev/mapper/leo--os-swap rd.driver.blacklist=nouveau nvidia_drm.modeset=1 zswap.enabled=0 loglevel=3 quiet
+root=/dev/mapper/leo--os-root rd.luks.name=${SYSUUID}=cryptos rd.luks.options=cryptos=password echo=no,discard=0,timeout=20s,tries=3 rd.lvm.lv=leo-os/root loglevel=3 quiet
 EOF
 ```
 
@@ -764,7 +764,6 @@ cat /etc/kernel/cmdline
 > - `rd.luks.name=`: LUKS device UUID and mapper name
 > - `rd.luks.options=`: LUKS unlock options (no discard for security, 3 unlock attempts)
 > - `rd.lvm.lv=`: LVM volumes to activate
-> - `resume=`: Hibernation resume device
 > - `loglevel=3`: Reduced kernel verbosity
 > - `quiet`: Minimal boot messages
 
@@ -819,11 +818,9 @@ EOF
 ### Generate Initial UKIs
 
 ```bash
-for k in /usr/lib/modules/*/vmlinuz; do
-  [ -e "$k" ] || continue
-  v="${k%/vmlinuz}"
-  v="${v##*/}"
-  kernel-install add "$v" "$k"
+for dir in /usr/lib/modules/*; do
+    [[ -f $dir/vmlinuz ]] || continue
+    kernel-install add "${dir##*/}" "$dir/vmlinuz"
 done
 ```
 
@@ -845,17 +842,15 @@ ls -lh /boot/EFI/Linux/
 ```bash
 sudo install -Dm0755 /dev/stdin /usr/local/libexec/uki-rebuild-sign.sh <<'EOF'
 #!/usr/bin/env sh
+#!/usr/bin/env sh
 set -eu
-
-# Rebuild all UKIs and re-sign
-for k in /usr/lib/modules/*/vmlinuz; do
-  [ -e " $ k" ] || continue
-  v=" $ {k%/vmlinuz}"
-  v=" $ {v##*/}"
-  kernel-install add " $ v" "$k"
+for dir in /usr/lib/modules/*; do
+    [[ -f $dir/vmlinuz ]] || continue
+    kernel-install add "${dir##*/}" "$dir/vmlinuz"
 done
-
-find /boot/EFI/Linux -type f -name "*.efi" -exec sbctl sign -s {} \;
+# sign UKIs and systemd-boot in one shot
+find /boot/EFI/Linux   -name '*.efi' -exec sbctl sign -s {} +
+find /usr/lib/systemd/boot/efi -name 'systemd-boot*.efi' -exec sbctl sign -s {} +
 EOF
 ```
 
@@ -870,43 +865,16 @@ Operation = Install
 Operation = Upgrade
 Type = Path
 Target = usr/lib/modules/*/vmlinuz
-
-[Action]
-Description = Rebuilding UKIs via kernel-install and signing with sbctl...
-When = PostTransaction
-Depends = sh
-Exec = /usr/local/libexec/uki-rebuild-sign.sh
-EOF
-```
-
-### NVIDIA Driver Update Hook
-
-Create `/etc/pacman.d/hooks/91-uki-rebuild-on-nvidia.hook`:
-
-```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/91-uki-rebuild-on-nvidia.hook <<'EOF'
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Operation = Remove
 Type = Package
-# Keep exactly what you had
 Target = nvidia
 Target = nvidia-lts
-Target = linux
-Target = linux-lts
 
 [Action]
-Description = Rebuilding UKIs due to NVIDIA change (skips if a kernel also changed) ...
+Description = Re-building and signing UKIs…
 When = PostTransaction
-Depends = sh
-NeedsTargets
 Exec = /usr/local/libexec/uki-rebuild-sign.sh
 EOF
 ```
-
->[!note]
->Both hooks call the same script (`uki-rebuild-sign.sh`) to maintain consistency. The script rebuilds all kernel UKIs and signs them with sbctl.
 
 ### Systemd-Boot Update Hook
 
@@ -920,37 +888,36 @@ Operation = Upgrade
 Target = systemd
 
 [Action]
-Description = Gracefully upgrading systemd-boot...
+Description = Updating systemd-boot…
 When = PostTransaction
-Exec = /usr/bin/systemctl restart systemd-boot-update.service
+Exec = /usr/bin/bootctl update
 EOF
 ```
 
 ### Secure Boot Signing Hook
 
-Create `/etc/pacman.d/hooks/80-secureboot.hook`:
+Create `/etc/pacman.d/hooks/99-re-sign-after-keys.hook`:
 
 ```bash
 install -Dm0644 /dev/stdin /etc/pacman.d/hooks/80-secureboot.hook <<'EOF'
 [Trigger]
+Type = Path
 Operation = Install
 Operation = Upgrade
-Type = Path
-Target = usr/lib/systemd/boot/efi/systemd-boot*.efi
+Operation = Remove
+Target = etc/secureboot/*
+Target = usr/share/secureboot/*
 
 [Action]
-Description = Signing systemd-boot EFI binary for Secure Boot
+Description = Re-signing all EFI binaries after key change…
 When = PostTransaction
-Depends = sh
-NeedsTargets
-Exec = /bin/sh -c 'while read -r f; do sbctl sign -s -o "${f}.signed" "$f"; done'
+Exec = /usr/local/libexec/uki-rebuild-sign.sh
 EOF
 ```
 
 > [!note] 
 > These hooks automate critical maintenance tasks:
 > - Rebuild UKIs when kernels are installed/upgraded
-> - Rebuild UKIs when NVIDIA drivers change
 > - Sign all EFI binaries for Secure Boot compatibility
 > - Update systemd-boot when systemd is upgraded
 
@@ -1218,12 +1185,14 @@ swapoff /dev/mapper/leo--os-swap
 
 # Close encrypted volumes
 cryptsetup close cryptdata
-cryptsetup close cryptos
-cryptsetup close cryptvms
 
 # Deactivate LVM
 vgchange -an leo-os
 vgchange -an leo-vms
+
+cryptsetup close cryptos
+cryptsetup close cryptvms
+
 ```
 
 ### Reboot
