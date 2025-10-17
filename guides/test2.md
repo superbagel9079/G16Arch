@@ -338,7 +338,7 @@ vgdisplay
 lvdisplay
 ```
 
-### Nested Encryption for Data Volume
+### Optional: Nested Encryption for Data Volume
 
 ```bash
 # Encrypt the data LV
