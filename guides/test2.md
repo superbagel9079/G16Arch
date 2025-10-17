@@ -5,21 +5,22 @@
 3. [Disk Layout Planning](#disk-layout-planning)
 4. [Disk Preparation](#disk-preparation)
 5. [Partition Creation](#partition-creation)
-6. [Encryption Setup]
-7. [LVM Configuration]
-8. [Filesystem Creation]
-9. [Mounting Filesystems]
-10. [Base System Installation]
-11. [System Configuration]
-12. [Boot Configuration]
-13. [Secure Boot Setup]
-14. [Package Management]
-15. [System Services]
-16. [Finalization]
-17. [Post-Installation]
-18. [Maintenance]
-19. [Troubleshooting]
-20. [Resources]
+6. [Encryption Setup](#encryption-setup)
+7. [LVM Configuration](#lvm-configuration)
+8. [Filesystem Creation](#filesystem-creation)
+9. [Mounting Filesystems](#mounting-filesystems)
+10. [Base System Installation](#base-system-installation)
+11. [System Configuration](#system-configuration)
+12. [Boot Configuration](#boot-configuration)
+13. [Secure Boot Setup](#secure-boot-setup)
+14. [Package Management](#package-managment)
+15. [Pacman Hooks](#pacman-hooks)
+16. [Secure Boot Setup](#secure-boot-setup)
+17. [System Services](#system-services)
+18. [Finalization](#finalization)
+19. [Post-Installation Tasks](#post-installation-tasks)
+20. [Maintenance](#maintenance)
+21. [Resources](#ressources)
 
 ## Prerequisites
 **Hardware**:
@@ -618,7 +619,7 @@ EOF
 >- `NVreg_PreserveVideoMemoryAllocations=1`: Required for suspend/resume
 >- `NVreg_TemporaryFilePath=/var/tmp`: Alternative temp location
 
-## Kernel Command Line Configuration
+### Kernel Command Line
 
 **Get system LUKS UUID**:
 
@@ -652,7 +653,7 @@ cat /etc/kernel/cmdline
 >- `rd.lvm.lv=`: LVM volume to activate
 >- `nvidia_drm.modeset=1`: Enable NVIDIA KMS
 
-## Unified Kernel Images (UKI)
+### Unified Kernel Images (UKI)
 
 **Install systemd-boot**:
 
