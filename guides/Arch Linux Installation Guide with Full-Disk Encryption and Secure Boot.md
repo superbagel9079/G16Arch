@@ -1097,9 +1097,9 @@ sbctl create-keys
 sbctl enroll-keys --microsoft
 
 # Sign systemd-boot bootloader
-sbctl sign -s -o /usr/lib/systemd/boot/efi/systemd-bootx64.efi.signed /usr/lib/systemd/boot/efi/systemd-bootx64.efi
-
-sbctl sign -s -o /boot/EFI/boot/Bootx64.efi
+sbctl sign -s /usr/lib/systemd/boot/efi/systemd-bootx64.efi
+sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi   # fallback file
+sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
 
 # Regenerate the initramfs
 pacman -S linux linux-lts
