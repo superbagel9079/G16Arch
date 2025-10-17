@@ -253,7 +253,8 @@ cryptsetup luksFormat --type luks2 \
 **Open encrypted container**:
 
 ```bash
-cryptsetup open /dev/nvme1n1p2 cryptos
+cryptsetup open --persistent /dev/nvme0n1p2 cryptos
+cryptsetup open --persistent /dev/nvme0n1p3 cryptvms
 ```
 
 ### Configure LUKS2 for VM Partition (Optional)
@@ -989,7 +990,7 @@ mount --mkdir /dev/mapper/cryptdata /data -o noatime,nodev,nosuid,noexec
 **VM storage**:
 
 ```bash
-cryptsetup open /dev/mapper/leo--vms-vms cryptvms
+cryptsetup open /dev/nvme0n1p3 cryptvms
 mount --mkdir /dev/mapper/leo--vms-vms /vms -o noatime,discard=async
 ```
 
