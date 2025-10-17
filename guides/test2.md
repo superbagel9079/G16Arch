@@ -320,20 +320,15 @@ lvcreate -l 15%FREE -n home leo-os
 lvcreate -l 5%FREE -n data leo-os
 ```
 
->[!TIP]
->Adjust sizes based on your needs:
->- **Root**: 30-50GB typically sufficient
->- **Var**: Depends on logging and package cache usage
->- **Home**: As much as you need for personal files
->- **Swap**: 4-8GB minimum
->- **Data**: Optional volume for extra security layer
-
 **VM volume (optional)**:
 
 ```bash
 # Use all remaining space
 lvcreate -l 100%FREE -n vms leo-vms
 ```
+
+>[!TIP]
+>Size allocations are percentages of remaining free space, calculated sequentially. Adjust percentages based on your storage requirements and usage patterns.
 
 ### Verify LVM structure:
 
