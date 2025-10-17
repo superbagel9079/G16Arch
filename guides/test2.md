@@ -237,7 +237,6 @@ cryptsetup luksFormat --type luks2 \
   --key-size 512 \
   --hash sha512 \
   --pbkdf argon2id \
-  --use-random \
   /dev/nvme1n1p2
 
 # Type YES and enter a strong passphrase
@@ -254,8 +253,10 @@ cryptsetup luksFormat --type luks2 \
 
 ```bash
 cryptsetup open --persistent /dev/nvme0n1p2 cryptos
-cryptsetup open --persistent /dev/nvme0n1p3 cryptvms
 ```
+
+>[!note]
+>The `--persistent` flag stores the mapping in `/etc/crypttab.initramfs`, ensuring consistent device mapper names across reboots when handled by dracut.
 
 ### Configure LUKS2 for VM Partition (Optional)
 
@@ -266,11 +267,10 @@ cryptsetup luksFormat --type luks2 \
   --key-size 512 \
   --hash sha512 \
   --pbkdf argon2id \
-  --use-random \
   /dev/nvme1n1p3
 
 # Open encrypted container
-cryptsetup open /dev/nvme1n1p3 cryptvms
+cryptsetup open --persistent /dev/nvme1n1p3 cryptvms
 ```
 
 >[!TIP]
@@ -282,7 +282,6 @@ cryptsetup open /dev/nvme1n1p3 cryptvms
 - `--key-size 512`: Maximum security for AES-XTS
 - `--hash sha512`: Strong hashing algorithm
 - `--pbkdf argon2id`: Memory-hard key derivation (resists brute-force)
-- `--use-random`: High-quality randomness source
 
 ## LVM Configuration
 
@@ -290,14 +289,14 @@ cryptsetup open /dev/nvme1n1p3 cryptvms
 
 ```bash
 pvcreate /dev/mapper/cryptos
-pvcreate /dev/mapper/cryptvms  # Optional
+pvcreate /dev/mapper/cryptvms
 ```
 
 ### Create Volume Groups
 
 ```bash
 vgcreate leo-os /dev/mapper/cryptos
-vgcreate leo-vms /dev/mapper/cryptvms  # Optional
+vgcreate leo-vms /dev/mapper/cryptvms
 ```
 
 ### Create Logical Volumes
@@ -356,7 +355,7 @@ cryptsetup luksFormat --type luks2 \
   /dev/mapper/leo--os-data
 
 # Open encrypted data volume
-cryptsetup open /dev/mapper/leo--os-data cryptdata
+cryptsetup open --persistent /dev/mapper/leo--os-data cryptdata
 ```
 
 >[!NOTE]
