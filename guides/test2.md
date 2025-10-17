@@ -208,14 +208,15 @@ nvme sanitize /dev/nvme1n1 --sanact=1
 parted -s /dev/nvme1n1 mklabel gpt
 
 # Create ESP (1GB)
-parted -s /dev/nvme1n1 mkpart primary fat32 1MiB 1025MiB
+parted -s /dev/nvme1n1 mkpart ESP fat32 1MiB 1025MiB
 parted -s /dev/nvme1n1 set 1 esp on
+parted -s /dev/nvme1n1 set 1 boot on
 
 # Create Linux system partition (adjust size as needed)
-parted -s /dev/nvme1n1 mkpart primary 1025MiB 500GiB
+parted -s /dev/nvme1n1 mkpart primary 1025MiB 70%
 
 # Create VM partition (optional, use remaining space)
-parted -s /dev/nvme1n1 mkpart primary 500GiB 100%
+parted -s /dev/nvme1n1 mkpart primary 70% 100%
 
 # Verify
 parted /dev/nvme1n1 print
