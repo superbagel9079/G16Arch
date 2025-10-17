@@ -483,11 +483,11 @@ swapon /dev/mapper/leo--os-swap
 ```bash
 pacstrap -K /mnt \
   base base-devel linux linux-firmware linux-lts intel-ucode \
-  busybox e2fsprogs xfsprogs cryptsetup lvm2 networkmanager \
+  busybox e2fsprogs xfsprogs cryptsetup lvm2 networkmanager iwd \
   vim nano man-db man-pages texinfo \
   dracut systemd-ukify \
   sbctl \
-  nvidia nvidia-lts nvidia-utils nvidia-prime \
+  nvidia nvidia-lts nvidia-utils \
   power-profiles-daemon
 ```
 
@@ -602,25 +602,26 @@ echo 'Defaults logfile=/var/log/sudo.log' > /etc/sudoers.d/logging
 Create `/etc/dracut.conf.d/10-minimal.conf`:
 
 ```bash
-cat > /etc/dracut.conf.d/10-minimal.conf <<'EOF'
-# Host-only configuration for minimal image size
+install -Dm0644 /dev/stdin /etc/dracut.conf.d/00-global.conf <<'EOF'
 hostonly="yes"
 hostonly_mode="strict"
-
-# Compression
-compress="zstd -T0 -3"
-
-# Quiet boot
 loglevel=3
+EOF
 
-# Required modules for encrypted LVM root
-add_dracutmodules+=" systemd crypt lvm resume busybox "
+install -Dm0644 /dev/stdin /etc/dracut.conf.d/05-compress.conf <<'EOF'
+compress="zstd -T0 -3"
+EOF
 
-# Hardware drivers needed at boot
+install -Dm0644 /dev/stdin /etc/dracut.conf.d/10-modules.conf <<'EOF'
+add_dracutmodules+=" systemd crypt lvm resume busybox i18n "
+EOF
+
+install -Dm0644 /dev/stdin /etc/dracut.conf.d/20-drivers.conf <<'EOF'
 add_drivers+=" nvme xhci_pci i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm "
+EOF
 
-# Omit unnecessary modules
-omit_dracutmodules+=" network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs zram dmsquash-live livenet plymouth "
+install -Dm0644 /dev/stdin /etc/dracut.conf.d/90-omit.conf <<'EOF'
+omit_dracutmodules+=" dracut-systemd network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs zram dmsquash-live livenet plymouth "
 EOF
 ```
 
@@ -687,12 +688,11 @@ EOF
 
 ### Blacklist Nouveau
 
-Create `/etc/modprobe.d/blacklist-nouveau.conf`:
+Create `/etc/modprobe.d/05-blacklist-nouveau.conf`:
 
 ```bash
-cat > /etc/modprobe.d/blacklist-nouveau.conf <<'EOF'
+install -Dm0644 /dev/stdin /etc/modprobe.d/05-blacklist-nouveau.conf <<'EOF'
 blacklist nouveau
-options nouveau modeset=0
 EOF
 ```
 
@@ -707,15 +707,13 @@ EOF
 > - Using only Nouveau (no proprietary drivers installed)
 > - System has Intel/AMD graphics only (Nouveau never loads)
 > - NVIDIA drivers not included in initramfs (less critical but still recommended for consistency)
-> 
-> The modeset=0 option is a safety fallback that prevents Nouveau from taking display control even if it somehow loads despite blacklisting.
 
 ### Configure NVIDIA KMS
 
-Create `/etc/modprobe.d/nvidia-kms.conf`:
+Create `/etc/modprobe.d/10-nvidia-kms.conf`:
 
 ```bash
-cat > /etc/modprobe.d/nvidia-kms.conf <<'EOF'
+install -Dm0644 /dev/stdin /etc/modprobe.d/10-nvidia-kms.conf <<'EOF'
 options nvidia_drm modeset=1 fbdev=1
 options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_TemporaryFilePath=/var/tmp
 EOF
