@@ -840,18 +840,33 @@ ls -lh /boot/EFI/Linux/
 ### Create the shared rebuild script:
 
 ```bash
-sudo install -Dm0755 /dev/stdin /usr/local/libexec/uki-rebuild-sign.sh <<'EOF'
-#!/usr/bin/env sh
 #!/usr/bin/env sh
 set -eu
+# rebuild all UKIs
 for dir in /usr/lib/modules/*; do
     [[ -f $dir/vmlinuz ]] || continue
     kernel-install add "${dir##*/}" "$dir/vmlinuz"
 done
-# sign UKIs and systemd-boot in one shot
+# sign everything
 find /boot/EFI/Linux   -name '*.efi' -exec sbctl sign -s {} +
 find /usr/lib/systemd/boot/efi -name 'systemd-boot*.efi' -exec sbctl sign -s {} +
-EOF
+
+# ---------- friendly names ----------
+cd /boot/EFI/Linux
+for k in /usr/lib/modules/*/vmlinuz; do
+    [[ -f $k ]] || continue
+    ver=${k%/vmlinuz}
+    ver=${ver##*/}
+    case $ver in
+        *-lts) title="Arch Linux (LTS) (${ver})" ;;
+        *)     title="Arch Linux (Main) (${ver})" ;;
+    esac
+    safe=${title// /-}.efi
+    ln -f "${ver}.efi" "$safe" 2>/dev/null || cp "${ver}.efi" "$safe"
+    printf '%s' "$title" > "$safe.splash"
+done
+# keep only the pretty-named UKIs
+rm -f [0-9a-f]*-*.efi        # deletes raw *.efi files
 ```
 
 ### UKI Rebuild and Signing Hook
