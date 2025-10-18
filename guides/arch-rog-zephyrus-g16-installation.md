@@ -760,13 +760,15 @@ Automated maintenance hooks ensure your system stays bootable after updates.
 install -Dm0755 /dev/stdin /usr/local/bin/uki-rebuild-sign.sh <<'EOF'
 #!/usr/bin/env sh
 set -eu
+
 # rebuild all UKIs
 for dir in /usr/lib/modules/*; do
     [[ -f $dir/vmlinuz ]] || continue
     kernel-install add "${dir##*/}" "$dir/vmlinuz"
 done
+
 # sign everything
-find /boot/EFI/Linux   -name '*.efi' -exec sbctl sign -s {} +
+find /boot/EFI/Linux -name '*.efi' -exec sbctl sign -s {} +
 find /usr/lib/systemd/boot/efi -name 'systemd-boot*.efi' -exec sbctl sign -s {} +
 
 # ---------- friendly names ----------
@@ -783,8 +785,9 @@ for k in /usr/lib/modules/*/vmlinuz; do
     ln -f "${ver}.efi" "$safe" 2>/dev/null || cp "${ver}.efi" "$safe"
     printf '%s' "$title" > "$safe.splash"
 done
-# keep only the pretty-named UKIs
-rm -f [0-9a-f]*-*.efi        # deletes raw *.efi files
+
+# safer clean-up
+rm -f -- [0-9a-f]*-*.efi
 EOF
 ```
 
