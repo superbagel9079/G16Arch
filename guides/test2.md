@@ -850,7 +850,6 @@ EOF
 >[!NOTE]
 >**Hook execution order**:
 >- 90: Rebuild UKIs when kernel updates
->- 91: Rebuild UKIs when NVIDIA updates
 >- 95: Update systemd-boot itself
 >- 99: Sign everything for Secure Boot
 >
