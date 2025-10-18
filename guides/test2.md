@@ -536,6 +536,7 @@ sed -i 's/^# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/' /etc/sudoers
 # Add explicit user permission
 install -Dm0440 /dev/stdin /etc/sudoers.d/leo <<'EOF'
 leo ALL=(ALL:ALL) ALL
+EOF
 
 # Enable sudo logging
 install -Dm0440 /dev/stdin /etc/sudoers.d/logging <<'EOF'
