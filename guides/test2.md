@@ -673,7 +673,7 @@ echo "System LUKS UUID: $SYSUUID"
 **Create kernel command line**:
 
 ```bash
-install -Dm0644 /dev/stdin /etc/kernel/cmdline <<EOF
+install -Dm0644 /dev/stdin /etc/kernel/cmdline <<'EOF'
 root=/dev/mapper/leo--os-root rd.luks.name=${SYSUUID}=cryptos rd.luks.options=cryptos=password echo=no,discard=0,timeout=20s,tries=3 rd.lvm.lv=leo-os/root loglevel=3 quiet
 EOF
 ```
