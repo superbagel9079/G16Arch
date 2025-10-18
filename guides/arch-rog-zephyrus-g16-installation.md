@@ -410,7 +410,7 @@ swapon /dev/mapper/leo--os-swap
 
 >[!TIP]
 >**Mount options explained**:
->- `noatime`: Reduces writes (better SSD lifespan)
+>- `noatime`,`lazytime`: Reduces writes (better SSD lifespan)
 >- `nodev`: Prevents device file interpretation
 >- `nosuid`: Ignores setuid/setgid bits (security)
 >- `noexec`: Prevents direct execution (safe for ESP)
