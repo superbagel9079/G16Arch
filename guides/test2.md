@@ -565,7 +565,7 @@ compress="zstd -T0 -3"
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/10-modules.conf <<'EOF'
-add_dracutmodules+=" systemd crypt lvm resume busybox i18n "
+add_dracutmodules+=" systemd crypt lvm busybox i18n "
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/20-drivers.conf <<'EOF'
@@ -573,17 +573,63 @@ add_drivers+=" nvme xhci_pci i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm "
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/90-omit.conf <<'EOF'
-omit_dracutmodules+=" network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs zram dmsquash-live livenet plymouth "
+omit_dracutmodules+=" network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs dmsquash-live livenet plymouth "
 EOF
 ```
 
->[!NOTE]
->**Dracut configuration explained**:
->- `hostonly="yes"`: Include only current hardware drivers (smaller initramfs)
->- `systemd`: Modern init for initramfs
->- `crypt`: LUKS decryption support
->- `lvm`: LVM activation
->- `nvidia*`: Early GPU initialization
+> [!note] 
+> Configuration explained:
+> 
+> **Core settings:**
+> - `hostonly="yes"`: Include only drivers/modules for current hardware
+> - `hostonly_mode="strict"`: Maximum reduction of initramfs size
+> - `compress="zstd -T0 -3"`: Multi-threaded compression, balance between speed and size
+> - `loglevel=3`: Reduce boot verbosity (errors and warnings only)
+>
+> **Required modules:**
+> - `systemd`: Modern init system for initramfs
+> - `crypt`: LUKS encryption support
+> - `lvm`: LVM volume activation
+> - `busybox`: Minimal emergency shell and core utilities
+>
+> **Essential drivers:**
+> - `nvme`: NVMe SSD controller
+> - `xhci_pci`: USB 3.0+ host controller
+> - `i915`: Intel integrated graphics (for early KMS)
+> - `nvidia*`: NVIDIA GPU drivers for early modesetting
+
+> [!note]
+> Omitted modules and their purposes:
+> 
+> **Network-related (not needed for local boot):**
+> - `network`: Generic network support
+> - `network-manager`: NetworkManager integration
+> - `wicked`: SUSE network manager
+> - `nfs`: Network File System client
+> - `iscsi`: Internet SCSI remote storage
+> - `url-lib`: HTTP/FTP fetching capabilities
+> 
+> **Storage technologies (not in use):**
+> - `mdraid`: Software RAID (md)
+> - `multipath`: Multi-path device management
+> - `btrfs`: Btrfs filesystem (using ext4/xfs)
+> - `dmsquash-live`: Live system support (squashfs)
+> 
+> **Boot environment features:**
+> - `livenet`: Network-based live systems
+> - `plymouth`: Graphical boot splash screen
+
+> [!warning]
+> If you later add dual-boot with network boot (PXE), encrypted network storage (iSCSI), or software RAID, you must remove the corresponding entries from `omit_dracutmodules` and regenerate the initramfs with `kernel-install`.
+
+> [!tip] 
+> Omitting unused modules reduces:
+> - Attack surface (fewer code paths)
+> - initramfs size (faster loading)
+> - Boot time (fewer modules to process)
+> - Memory footprint during early boot.
+> 
+> If you need network boot or mdraid later, remove those entries from `omit_dracutmodules`. You must also explicitly add it to `add_dracutmodules` to ensure it's included in the initramfs.
 
 
 ### Kernel Modules Configuration
