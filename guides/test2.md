@@ -443,7 +443,7 @@ Expected output:
 pacstrap -K /mnt \
   base base-devel linux linux-firmware linux-lts intel-ucode \
   busybox e2fsprogs xfsprogs cryptsetup lvm2 util-linux \
-  networkmanager iwd dhcpcd \
+  networkmanager iwd \
   vim nano man-db man-pages texinfo \
   dracut systemd-ukify \
   sbctl \
