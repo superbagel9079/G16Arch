@@ -490,7 +490,6 @@ hwclock --systohc
 
 ```bash
 # Enable English locale
-
 sed -i 's/^#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen
 
