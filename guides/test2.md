@@ -1119,6 +1119,6 @@ cryptsetup luksHeaderRestore /dev/nvme1n1p3 --header-backup-file /root/cryptvms.
 - [Arch Wiki: Power Management](https://wiki.archlinux.org/title/Power_management)
 - [Arch Wiki: Laptop](https://wiki.archlinux.org/title/Laptop)
 
+## License
 
-License
 Documentation provided as-is for educational purposes.
