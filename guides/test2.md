@@ -619,9 +619,6 @@ EOF
 > - `livenet`: Network-based live systems
 > - `plymouth`: Graphical boot splash screen
 
-> [!warning]
-> If you later add dual-boot with network boot (PXE), encrypted network storage (iSCSI), or software RAID, you must remove the corresponding entries from `omit_dracutmodules` and regenerate the initramfs with `kernel-install`.
-
 > [!tip] 
 > Omitting unused modules reduces:
 > - Attack surface (fewer code paths)
