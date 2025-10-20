@@ -771,23 +771,11 @@ done
 find /boot/EFI/Linux -name '*.efi' -exec sbctl sign -s {} +
 find /usr/lib/systemd/boot/efi -name 'systemd-boot*.efi' -exec sbctl sign -s {} +
 
-# ---------- friendly names ----------
-cd /boot/EFI/Linux
-for k in /usr/lib/modules/*/vmlinuz; do
-    [[ -f $k ]] || continue
-    ver=${k%/vmlinuz}
-    ver=${ver##*/}
-    case $ver in
-        *-lts) title="Arch Linux (LTS) (${ver})" ;;
-        *)     title="Arch Linux (Main) (${ver})" ;;
-    esac
-    safe=${title// /-}.efi
-    ln -f "${ver}.efi" "$safe" 2>/dev/null || cp "${ver}.efi" "$safe"
-    printf '%s' "$title" > "$safe.splash"
-done
-
-# safer clean-up
-rm -f -- [0-9a-f]*-*.efi
+# update static titles with the newest UKI files
+newest=$(ls -1v /boot/EFI/Linux/*-arch*.efi | tail -n1)
+lts=$(ls -1v /boot/EFI/Linux/*-lts*.efi | tail -n1)
+sed -i "s|/EFI/Linux/.*arch.*\\.efi|/EFI/Linux/${newest##*/}|; s|(Main) ([^)]*)|(Main) (${newest##*-})|" /boot/loader/entries/arch.conf
+sed -i "s|/EFI/Linux/.*lts.*\\.efi|/EFI/Linux/${lts##*/}|; s|(LTS) ([^)]*)|(LTS) (${lts##*-})|"   /boot/loader/entries/arch-lts.conf
 EOF
 ```
 
