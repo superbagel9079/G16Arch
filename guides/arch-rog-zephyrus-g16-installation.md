@@ -770,12 +770,6 @@ done
 # sign everything
 find /boot/EFI/Linux -name '*.efi' -exec sbctl sign -s {} +
 find /usr/lib/systemd/boot/efi -name 'systemd-boot*.efi' -exec sbctl sign -s {} +
-
-# update static titles with the newest UKI files
-newest=$(ls -1v /boot/EFI/Linux/*-arch*.efi | tail -n1)
-lts=$(ls -1v /boot/EFI/Linux/*-lts*.efi | tail -n1)
-sed -i "s|/EFI/Linux/.*arch.*\\.efi|/EFI/Linux/${newest##*/}|; s|(Main) ([^)]*)|(Main) (${newest##*-})|" /boot/loader/entries/arch.conf
-sed -i "s|/EFI/Linux/.*lts.*\\.efi|/EFI/Linux/${lts##*/}|; s|(LTS) ([^)]*)|(LTS) (${lts##*-})|"   /boot/loader/entries/arch-lts.conf
 EOF
 ```
 
