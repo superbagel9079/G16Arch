@@ -124,7 +124,7 @@ timedatectl status
 - **root**: Core system files (/)
 - **var**: Logs, caches, package databases (/var)
 - **home**: User files and configurations (/home)
-- **swap**: Hibernation support (size = RAM)
+- **swap**: (size = 8G)
 - **data**: Nested encrypted storage for sensitive documents
 
 **VM volume in leo-vms (optional)**:
@@ -252,7 +252,7 @@ cryptsetup luksFormat --type luks2 \
 **Open encrypted container**:
 
 ```bash
-cryptsetup open --persistent /dev/nvme0n1p2 cryptos
+cryptsetup open --persistent /dev/nvme1n1p2 cryptos
 ```
 
 >[!note]
@@ -757,7 +757,7 @@ Automated maintenance hooks ensure your system stays bootable after updates.
 ### Shared Rebuild Script
 
 ```bash
-install -Dm0755 /dev/stdin /usr/local/bin/uki-rebuild-sign.sh <<'EOF'
+install -Dm0755 /dev/stdin /usr/local/libexec/uki-rebuild-sign.sh <<'EOF'
 #!/usr/bin/env sh
 set -eu
 
@@ -917,9 +917,6 @@ ls -l /mnt/win-esp/EFI/Microsoft/Boot/
 
 # Copy Windows bootloader to Linux ESP
 cp -a /mnt/win-esp/EFI/Microsoft /boot/EFI/
-
-# Sign Windows bootloader for Secure Boot
-sbctl sign -s /boot/EFI/Microsoft/Boot/bootmgfw.efi
 
 # Clean up
 umount /mnt/win-esp
