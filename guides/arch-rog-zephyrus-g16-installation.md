@@ -1062,6 +1062,16 @@ Add to `/etc/fstab` for automatic mounting:
 >[!warning]
 >The nested encrypted data volume requires manual unlocking. Consider creating a systemd service or script if automatic unlocking is desired.
 
+### Enable Essential Service
+
+```bash
+systemctl enable fstrim.timer
+```
+
+>[!NOTE]
+>**Service explained**:
+>`fstrim.timer`: Weekly SSD TRIM for longevity
+
 ## Maintenance
 
 ### LUKS Key Management
