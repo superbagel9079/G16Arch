@@ -441,13 +441,13 @@ Expected output:
 
 ```bash
 pacstrap -K /mnt \
-  base base-devel linux linux-firmware linux-lts intel-ucode \
-  busybox e2fsprogs xfsprogs cryptsetup lvm2 util-linux \
+  base base-devel linux-firmware linux-g14 linux-g14-headers linux-lts linux-lts-headers intel-ucode \
+  busybox e2fsprogs xfsprogs cryptsetup lvm2 \
   networkmanager iwd \
   vim nano man-db man-pages texinfo \
   dracut systemd-ukify \
   sbctl \
-  nvidia nvidia-lts nvidia-utils \
+  nvidia-dkms nvidia-utils \
   power-profiles-daemon
 ```
 
@@ -459,7 +459,7 @@ pacstrap -K /mnt \
 >- **Network**: networkmanager for easy connectivity
 >- **Boot**: dracut + systemd-ukify for UKI creation
 >- **Secure Boot**: sbctl for key management
->- **Graphics**: nvidia drivers for RTX 4070
+>- **Graphics**: nvidia driver for RTX 4070
 >- **Power**: power-profiles-daemon for laptop efficiency
 
 ### Generate Filesystem Table
@@ -561,19 +561,16 @@ loglevel=3
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/05-compress.conf <<'EOF'
-compress="zstd -T0 -3"
+compress="zstd"
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/10-modules.conf <<'EOF'
-add_dracutmodules+=" systemd crypt lvm busybox i18n "
+add_dracutmodules+=" crypt lvm busybox i18n "
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/20-drivers.conf <<'EOF'
-add_drivers+=" nvme xhci_pci i915 nvidia nvidia_modeset nvidia_uvm nvidia_drm "
-EOF
-
-install -Dm0644 /dev/stdin /etc/dracut.conf.d/90-omit.conf <<'EOF'
-omit_dracutmodules+=" network network-manager wicked nfs iscsi url-lib mdraid multipath btrfs dmsquash-live livenet plymouth "
+add_drivers+=" nvme i915 "
+force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "
 EOF
 ```
 
@@ -597,37 +594,6 @@ EOF
 > - `xhci_pci`: USB 3.0+ host controller
 > - `i915`: Intel integrated graphics (for early KMS)
 > - `nvidia*`: NVIDIA GPU drivers for early modesetting
-
-> [!note]
-> Omitted modules and their purposes:
-> 
-> **Network-related (not needed for local boot):**
-> - `network`: Generic network support
-> - `network-manager`: NetworkManager integration
-> - `wicked`: SUSE network manager
-> - `nfs`: Network File System client
-> - `iscsi`: Internet SCSI remote storage
-> - `url-lib`: HTTP/FTP fetching capabilities
-> 
-> **Storage technologies (not in use):**
-> - `mdraid`: Software RAID (md)
-> - `multipath`: Multi-path device management
-> - `btrfs`: Btrfs filesystem (using ext4/xfs)
-> - `dmsquash-live`: Live system support (squashfs)
-> 
-> **Boot environment features:**
-> - `livenet`: Network-based live systems
-> - `plymouth`: Graphical boot splash screen
-
-> [!tip] 
-> Omitting unused modules reduces:
-> - Attack surface (fewer code paths)
-> - initramfs size (faster loading)
-> - Boot time (fewer modules to process)
-> - Memory footprint during early boot.
-> 
-> If you need network boot or mdraid later, remove those entries from `omit_dracutmodules`. You must also explicitly add it to `add_dracutmodules` to ensure it's included in the initramfs.
-
 
 ### Kernel Modules Configuration
 
@@ -674,7 +640,7 @@ echo "System LUKS UUID: $SYSUUID"
 
 ```bash
 install -Dm0644 /dev/stdin /etc/kernel/cmdline <<'EOF'
-root=/dev/mapper/leo--os-root rd.luks.name=${SYSUUID}=cryptos rd.luks.options=cryptos=password-echo=no,discard=0,timeout=20s,tries=3 rd.lvm.lv=leo-os/root loglevel=3 quiet
+rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.no_discard rd.luks.noecho rd.luks.timeout=30 rd.luks.max_tries=3 nvidia_drm.modeset=1 loglevel=3 quiet
 EOF
 ```
 
@@ -757,44 +723,137 @@ Automated maintenance hooks ensure your system stays bootable after updates.
 ### Shared Rebuild Script
 
 ```bash
-install -Dm0755 /dev/stdin /usr/local/libexec/uki-rebuild-sign.sh <<'EOF'
-#!/usr/bin/env sh
-set -eu
+install -Dm0755 /dev/stdin /usr/share/libalpm/scripts/kernel-install <<'EOF'
+#!/bin/bash
+set -euo pipefail
+shopt -s inherit_errexit nullglob
 
-# rebuild all UKIs
-for dir in /usr/lib/modules/*; do
-    [[ -f $dir/vmlinuz ]] || continue
-    kernel-install add "${dir##*/}" "$dir/vmlinuz"
+cd /
+
+all_kernels=0
+declare -A versions
+
+add_file() {
+    local kver=${1##usr/lib/modules/}; kver=${kver%%/*}
+    versions[$kver]=
+}
+
+while read -r path; do
+    case "$path" in
+        usr/lib/modules/*/vmlinuz|usr/lib/modules/*/extramodules/*)
+            add_file "$path" ;;
+        *)  all_kernels=1 ;;
+    esac
 done
 
-# sign everything
-find /boot/EFI/Linux -name '*.efi' -exec sbctl sign -s {} +
-find /usr/lib/systemd/boot/efi -name 'systemd-boot*.efi' -exec sbctl sign -s {} +
+((all_kernels)) && \
+for file in usr/lib/modules/*/vmlinuz; do
+    pacman -Qqo "$file" &>/dev/null && add_file "$file"
+done
+
+for kver in "${!versions[@]}"; do
+    kimage=/usr/lib/modules/$kver/vmlinuz
+
+    # 1.  standard installation (creates /boot/EFI/Linux/arch-*-*.efi)
+    kernel-install "$@" "$kver" "$kimage" || true
+
+    # 2.  sign only when we are in the 'add' phase and UKI exists
+    if [[ $1 == add ]]; then
+        uki=$(bootctl -x 2>/dev/null | awk -v k="$kver" '$0 ~ k".efi" {print $NF; exit}')
+        if [[ -n $uki && -f $uki ]]; then
+            sbctl sign -s "$uki"
+        fi
+    fi
+done
 EOF
 ```
 
 ### UKI Rebuild Hook (Kernel Updates)
 
 ```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/90-uki-build-sign.hook <<'EOF'
+install -Dm0644 /dev/stdin /etc/pacman.d/hooks/40-kernel-install-remove.hook <<'EOF'
+[Trigger]
+Type = Path
+Operation = Upgrade
+Operation = Remove
+Target = usr/lib/modules/*/vmlinuz
+
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = usr/lib/initcpio/*
+Target = usr/lib/initcpio/*/*
+Target = usr/lib/firmware/*
+Target = usr/lib/modules/*/extramodules/*
+Target = usr/src/*/dkms.conf
+Target = usr/lib/booster/*
+Target = usr/lib/dracut/*
+Target = usr/lib/dracut/*/*
+Target = usr/lib/dracut/*/*/*
+Target = usr/lib/kernel/*
+Target = usr/lib/kernel/*/*
+Target = boot/*-ucode.img
+
+[Action]
+Description = Removing kernel and initrd using kernel-install...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/kernel-install remove
+NeedsTargets
+EOF
+```
+
+```bash
+install -Dm0644 /dev/stdin /etc/pacman.d/hooks/90-kernel-install-add.hook <<'EOF'
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/modules/*/vmlinuz
+
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = usr/lib/initcpio/*
+Target = usr/lib/initcpio/*/*
+Target = usr/lib/firmware/*
+Target = usr/lib/modules/*/extramodules/*
+Target = usr/src/*/dkms.conf
+Target = usr/lib/booster/*
+Target = usr/lib/dracut/*
+Target = usr/lib/dracut/*/*
+Target = usr/lib/dracut/*/*/*
+Target = usr/lib/kernel/*
+Target = usr/lib/kernel/*/*
+Target = boot/*-ucode.img
+
+[Action]
+Description = Installing kernel and initrd using kernel-install...
+When = PostTransaction
+Exec = /usr/share/libalpm/scripts/kernel-install add
+NeedsTargets
+EOF
+```
+
+### Secure Boot Signing Hook
+
+```bash
+install -Dm0644 /dev/stdin /etc/pacman.d/hooks/80-secureboot.hook <<'EOF'
 [Trigger]
 Operation = Install
 Operation = Upgrade
 Type = Path
-Target = usr/lib/modules/*/vmlinuz
-
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Package
-Target = nvidia
-Target = nvidia-lts
+Target = usr/lib/systemd/boot/efi/systemd-boot*.efi
 
 [Action]
-Description = Re-building and signing UKIs…
+Description = Signing systemd-boot EFI binary for Secure Boot
 When = PostTransaction
-Exec = /usr/local/libexec/uki-rebuild-sign.sh
-EOF
+Exec = /bin/sh -c 'while read -r f; do sbctl sign -s "$f"; done'
+Depends = sh
+NeedsTargets
 ```
 
 ### Systemd-Boot Update Hook
@@ -810,25 +869,6 @@ Target = systemd
 Description = Updating systemd-boot…
 When = PostTransaction
 Exec = /usr/bin/bootctl update
-EOF
-```
-
-### Secure Boot Signing Hook
-
-```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/80-secureboot.hook <<'EOF'
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = etc/secureboot/*
-Target = usr/share/secureboot/*
-
-[Action]
-Description = Re-signing all EFI binaries after key change…
-When = PostTransaction
-Exec = /usr/local/libexec/uki-rebuild-sign.sh
 EOF
 ```
 
@@ -890,7 +930,7 @@ sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
 
 ```bash
 # Regenerate the initramfs
-pacman -S linux linux-lts
+pacman -S linux-g14 linux-lts
 ```
 
 **Verify signatures**:
@@ -1086,6 +1126,7 @@ cryptsetup luksHeaderRestore /dev/nvme1n1p3 --header-backup-file /root/cryptvms.
 - [Arch Wiki: Unified Kernel Image](https://wiki.archlinux.org/title/Unified_kernel_image)
 - [Arch Wiki: Unified Extensible Firmware Interface/Secure Boot](https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot)
 - [Arch Wiki: NVIDIA](https://wiki.archlinux.org/title/NVIDIA)
+- [Arch Wiki: DKMS Support](https://wiki.archlinux.org/title/Dynamic_Kernel_Module_Support)
 
 ### Tools Documentation
 
@@ -1093,12 +1134,14 @@ cryptsetup luksHeaderRestore /dev/nvme1n1p3 --header-backup-file /root/cryptvms.
 - [systemd-boot Manual](https://man.archlinux.org/man/systemd-boot.7)
 - [cryptsetup Manual](https://man.archlinux.org/man/cryptsetup.8)
 - [sbctl GitHub](https://github.com/Foxboron/sbctl)
+- [pacman-hook-kernel-install](https://aur.archlinux.org/packages/pacman-hook-kernel-install)
 
 ### Related Guides
 
 - [Arch Wiki: Dual Boot with Windows](https://wiki.archlinux.org/title/Dual_boot_with_Windows)
 - [Arch Wiki: Power Management](https://wiki.archlinux.org/title/Power_management)
 - [Arch Wiki: Laptop](https://wiki.archlinux.org/title/Laptop)
+- 
 
 ## License
 
