@@ -233,10 +233,11 @@ lsblk /dev/nvme1n1
 ```bash
 # Encrypt system partition on Linux disk
 cryptsetup luksFormat --type luks2 \
-  --cipher aes-xts-plain64 \
-  --key-size 512 \
-  --hash sha512 \
-  --pbkdf argon2id \
+  --cipher=aes-xts-plain64 \
+  --sector-size=4096 \
+  --key-size=512 \
+  --hash=sha512 \
+  --pbkdf=argon2id \
   /dev/nvme1n1p2
 
 # Type YES and enter a strong passphrase
@@ -263,10 +264,11 @@ cryptsetup open --persistent /dev/nvme1n1p2 cryptos
 ```bash
 # Encrypt VM partition on Linux disk
 cryptsetup luksFormat --type luks2 \
-  --cipher aes-xts-plain64 \
-  --key-size 512 \
-  --hash sha512 \
-  --pbkdf argon2id \
+  --cipher=aes-xts-plain64 \
+  --sector-size=4096 \
+  --key-size=512 \
+  --hash=sha512 \
+  --pbkdf=argon2id \
   /dev/nvme1n1p3
 
 # Open encrypted container
@@ -343,10 +345,11 @@ lvdisplay
 ```bash
 # Encrypt the data LV
 cryptsetup luksFormat --type luks2 \
-  --cipher aes-xts-plain64 \
-  --key-size 512 \
-  --hash sha512 \
-  --pbkdf argon2id \
+  --cipher=aes-xts-plain64 \
+  --sector-size=4096 \
+  --key-size=512 \
+  --hash=sha512 \
+  --pbkdf=argon2id \
   /dev/mapper/leo--os-data
 
 # Open encrypted data volume
