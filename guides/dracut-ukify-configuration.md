@@ -23,9 +23,11 @@ colorize=auto
 # 1. Specify cmdline
 #    Alternatively, cmdline can be specified in /etc/kernel/cmdline
 #    If no cmdline was found, /proc/cmdline will be used
-ukify_global_args+=(--cmdline "root=/dev/sda1 quiet")
+# ukify_global_args+=(--cmdline "root=/dev/sda1 quiet")
+ukify_global_args+=(--cmdline "rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard=no,password-echo=no,timeout=30s,tries=3 nvidia_drm.modeset=1 loglevel=3 quiet")
 # 2. Sign UKI image for use with UEFI Secure Boot
-ukify_global_args+=(--secureboot-private-key /usr/share/secureboot/keys/db/db.key --secureboot-certificate /usr/share/secureboot/keys/db/db.pem)
+# ukify_global_args+=(--secureboot-private-key /usr/share/secureboot/keys/db/db.key --secureboot-certificate /usr/share/secureboot/keys/db/db.pem)
+ukify_global_args+=(--sign-kernel --secureboot-private-key /var/lib/sbctl/keys/db/db.key --secureboot-certificate /var/lib/sbctl/keys/db/db.pem)
 # 3. Add splash image (only BMP supported!)
 #ukify_global_args+=(--splash /usr/share/systemd/bootctl/splash-arch.bmp)
 # 4. Use systemd-sbsign to sign binaries for secure boot, requires systemd>=257
@@ -36,10 +38,13 @@ ukify_global_args+=(--secureboot-private-key /usr/share/secureboot/keys/db/db.ke
 # ukify_variants is are associative array where the key is variant name and value is dracut options to pass during generation
 # Note the "default" key is special - it will be omitted in the resulting image name
 # It can be used to create fallback images, for example:
-#ukify_variants=(
+# ukify_variants=(
 #  [default]="--hostonly"
 #  [fallback]="--no-hostonly"
-#)
+# )
+ukify_variants=(
+  [default]="--hostonly"
+)
 
 # Override UKI image path for each variant
 # Available variables:
@@ -58,6 +63,10 @@ ukify_global_args+=(--secureboot-private-key /usr/share/secureboot/keys/db/db.ke
 #  [default]='EFI/Linux/linux-${version}-${machine_id}-${build_id}.efi'
 #  [fallback]='${boot}/EFI/Linux/linux-${version}-${machine_id}-${build_id}-fallback.efi'
 #)
+
+ukify_install_path=(
+  [default]='EFI/Linux/linux-${version}-${machine_id}-${build_id}.efi'
+)
 
 # Override kernel cmdline per variant
 # It can be used to define each variant it's own cmdline, for example:
