@@ -444,11 +444,11 @@ Expected output:
 
 ```bash
 pacstrap -K /mnt \
-  base base-devel linux-firmware linux-g14 linux-g14-headers linux-lts linux-lts-headers intel-ucode \
+  base base-devel linux-firmware linux-lts linux-lts-headers intel-ucode \
   busybox e2fsprogs xfsprogs cryptsetup lvm2 \
   networkmanager iwd \
   vim nano man-db man-pages texinfo \
-  dracut systemd-ukify \
+  dracut systemd-ukify sbsigntools\
   sbctl \
   nvidia-dkms nvidia-utils \
   power-profiles-daemon
@@ -550,6 +550,44 @@ EOF
 >[!WARNING]
 >Always verify sudoers syntax: `visudo -c`. Syntax errors can lock you out of sudo.
 
+## Install G14 Kernel
+
+### Repository
+
+g14 repo contains all the tools you need on a ROG laptop precompiled for you. g14 is only a name and all tools from it apply to most ROG laptops Before adding the repo you need to add the repo sign key to your pacman-key. Run the following commands to add it:
+
+```bash
+pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
+```
+
+```bash
+wget "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x8b15a6b0e9a3fa35" -O g14.sec
+sudo pacman-key -a g14.sec
+```
+
+
+After that to get the repo add to your /etc/pacman.conf at the end:
+
+```bash
+[g14]
+Server = https://arch.asus-linux.org
+```
+
+After adding the repo run a full system update before you go to install tools from the repo:
+
+```bash
+pacman -Suy
+```
+
+### Install the kernel and tools
+
+```bash
+pacman -Sy linux-g14 linux-g14-headers asusctl supergfxctl
+```
+
 ## Boot Configuration
 
 ### Initramfs with Dracut
@@ -560,6 +598,7 @@ EOF
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/00-global.conf <<'EOF'
 hostonly="yes"
 hostonly_mode="strict"
+uefi="yes"
 loglevel=3
 EOF
 
@@ -643,7 +682,7 @@ echo "System LUKS UUID: $SYSUUID"
 
 ```bash
 install -Dm0644 /dev/stdin /etc/kernel/cmdline <<'EOF'
-rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.no_discard rd.luks.noecho rd.luks.timeout=30 rd.luks.max_tries=3 nvidia_drm.modeset=1 loglevel=3 quiet
+rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard=no,password-echo=no,timeout=30s,tries=3 nvidia_drm.modeset=1 loglevel=3 quiet
 EOF
 ```
 
@@ -718,170 +757,6 @@ You should see:
 
 >[!warning]
 >Do not manually run `dracut --uefi` for the same kernel version. `The kernel-install` command already handles UKI generation through dracut and ukify integration.
-
-## Pacman Hooks
-
-Automated maintenance hooks ensure your system stays bootable after updates.
-
-### Shared Rebuild Script
-
-```bash
-install -Dm0755 /dev/stdin /usr/share/libalpm/scripts/kernel-install <<'EOF'
-#!/bin/bash
-set -euo pipefail
-shopt -s inherit_errexit nullglob
-
-cd /
-
-all_kernels=0
-declare -A versions
-
-add_file() {
-    local kver=${1##usr/lib/modules/}; kver=${kver%%/*}
-    versions[$kver]=
-}
-
-while read -r path; do
-    case "$path" in
-        usr/lib/modules/*/vmlinuz|usr/lib/modules/*/extramodules/*)
-            add_file "$path" ;;
-        *)  all_kernels=1 ;;
-    esac
-done
-
-((all_kernels)) && \
-for file in usr/lib/modules/*/vmlinuz; do
-    pacman -Qqo "$file" &>/dev/null && add_file "$file"
-done
-
-for kver in "${!versions[@]}"; do
-    kimage=/usr/lib/modules/$kver/vmlinuz
-
-    # 1.  standard installation (creates /boot/EFI/Linux/arch-*-*.efi)
-    kernel-install "$@" "$kver" "$kimage" || true
-
-    # 2.  sign only when we are in the 'add' phase and UKI exists
-    if [[ $1 == add ]]; then
-        uki=$(bootctl -x 2>/dev/null | awk -v k="$kver" '$0 ~ k".efi" {print $NF; exit}')
-        if [[ -n $uki && -f $uki ]]; then
-            sbctl sign -s "$uki"
-        fi
-    fi
-done
-EOF
-```
-
-### UKI Rebuild Hook (Kernel Updates)
-
-```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/40-kernel-install-remove.hook <<'EOF'
-[Trigger]
-Type = Path
-Operation = Upgrade
-Operation = Remove
-Target = usr/lib/modules/*/vmlinuz
-
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = usr/lib/initcpio/*
-Target = usr/lib/initcpio/*/*
-Target = usr/lib/firmware/*
-Target = usr/lib/modules/*/extramodules/*
-Target = usr/src/*/dkms.conf
-Target = usr/lib/booster/*
-Target = usr/lib/dracut/*
-Target = usr/lib/dracut/*/*
-Target = usr/lib/dracut/*/*/*
-Target = usr/lib/kernel/*
-Target = usr/lib/kernel/*/*
-Target = boot/*-ucode.img
-
-[Action]
-Description = Removing kernel and initrd using kernel-install...
-When = PostTransaction
-Exec = /usr/share/libalpm/scripts/kernel-install remove
-NeedsTargets
-EOF
-```
-
-```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/90-kernel-install-add.hook <<'EOF'
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Target = usr/lib/modules/*/vmlinuz
-
-[Trigger]
-Type = Path
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Target = usr/lib/initcpio/*
-Target = usr/lib/initcpio/*/*
-Target = usr/lib/firmware/*
-Target = usr/lib/modules/*/extramodules/*
-Target = usr/src/*/dkms.conf
-Target = usr/lib/booster/*
-Target = usr/lib/dracut/*
-Target = usr/lib/dracut/*/*
-Target = usr/lib/dracut/*/*/*
-Target = usr/lib/kernel/*
-Target = usr/lib/kernel/*/*
-Target = boot/*-ucode.img
-
-[Action]
-Description = Installing kernel and initrd using kernel-install...
-When = PostTransaction
-Exec = /usr/share/libalpm/scripts/kernel-install add
-NeedsTargets
-EOF
-```
-
-### Secure Boot Signing Hook
-
-```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/80-secureboot.hook <<'EOF'
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Path
-Target = usr/lib/systemd/boot/efi/systemd-boot*.efi
-
-[Action]
-Description = Signing systemd-boot EFI binary for Secure Boot
-When = PostTransaction
-Exec = /bin/sh -c 'while read -r f; do sbctl sign -s "$f"; done'
-Depends = sh
-NeedsTargets
-```
-
-### Systemd-Boot Update Hook
-
-```bash
-install -Dm0644 /dev/stdin /etc/pacman.d/hooks/95-systemd-boot.hook <<'EOF'
-[Trigger]
-Type = Package
-Operation = Upgrade
-Target = systemd
-
-[Action]
-Description = Updating systemd-boot…
-When = PostTransaction
-Exec = /usr/bin/bootctl update
-EOF
-```
-
->[!NOTE]
->**Hook execution order**:
->- 90: Rebuild UKIs when kernel updates
->- 95: Update systemd-boot itself
->- 99: Sign everything for Secure Boot
->
->Lower numbers run first. This ensures components are built before signing.
 
 ### Package Management
 
@@ -986,7 +861,6 @@ rmdir /mnt/win-esp
 systemctl enable NetworkManager
 systemctl enable systemd-timesyncd
 systemctl enable power-profiles-daemon
-systemctl enable fstrim.timer
 ```
 
 >[!NOTE]
@@ -994,7 +868,6 @@ systemctl enable fstrim.timer
 >`NetworkManager`: Network connectivity
 >`systemd-timesyncd`: Time synchronization
 >`power-profiles-daemon`: Laptop power management
->`fstrim.timer`: Weekly SSD TRIM for longevity
 
 ## Finalization
 
@@ -1036,6 +909,40 @@ reboot
 >Remove the installation media. The system should boot to the LUKS password prompt.
 
 ## Post-Installation Tasks
+
+### Install yay
+
+```bash
+sudo pacman -Syu --needed git
+```
+
+Clone the yay repository from the AUR:
+
+```bash
+git clone https://aur.archlinux.org/yay.git
+```
+
+Navigate into the yay directory:
+
+```bash
+cd yay
+```
+
+Build and install yay using makepkg:
+
+```bash
+makepkg -si
+```
+
+Verify the installation was successful:
+
+```bash
+yay --version
+```
+
+### Generate a new initramfs on kernel upgrade
+
+Go to: [dracut-ukify-configuration]()
 
 ### Mount Additional Volumes
 
