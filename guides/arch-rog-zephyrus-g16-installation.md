@@ -130,7 +130,6 @@ timedatectl status
 **VM volume in leo-vms (optional)**:
 - **vms**: Virtual machine disk images
 
-
 >[!TIP]
 >**Customization options**:
 >- Skip `nvme1n1p3` if you don't use VMs - expand `nvme1n1p2` to 100%
@@ -281,6 +280,7 @@ cryptsetup open --persistent /dev/nvme1n1p3 cryptvms
 **Encryption Options Explained**
 - `--type luks2`: Modern LUKS version with better security
 - `--cipher aes-xts-plain64`: Industry-standard encryption
+- `sector-size 4096`: Matches modern SSD physical sector size
 - `--key-size 512`: Maximum security for AES-XTS
 - `--hash sha512`: Strong hashing algorithm
 - `--pbkdf argon2id`: Memory-hard key derivation (resists brute-force)
@@ -448,20 +448,20 @@ pacstrap -K /mnt \
   busybox e2fsprogs xfsprogs cryptsetup lvm2 \
   networkmanager iwd \
   vim nano man-db man-pages texinfo \
-  dracut systemd-ukify sbsigntools\
-  sbctl \
+  dracut systemd-ukify \
+  sbctl sbsigntools \
   nvidia-dkms nvidia-utils \
   power-profiles-daemon
 ```
 
 >[!NOTE]
 >**Package selection rationale**:
->- **Kernels**: linux (latest) + linux-lts (stable fallback)
+>- **Kernels**: linux-lts (stable fallback)
 >- **Microcode**: intel-ucode for CPU security updates
 >- **Encryption**: cryptsetup + lvm2 for LUKS and LVM
 >- **Network**: networkmanager for easy connectivity
 >- **Boot**: dracut + systemd-ukify for UKI creation
->- **Secure Boot**: sbctl for key management
+>- **Secure Boot**: sbctl + sbsingtools for key management
 >- **Graphics**: nvidia driver for RTX 4070
 >- **Power**: power-profiles-daemon for laptop efficiency
 
@@ -550,11 +550,11 @@ EOF
 >[!WARNING]
 >Always verify sudoers syntax: `visudo -c`. Syntax errors can lock you out of sudo.
 
-## Install G14 Kernel
+## Install G14 Repository
 
-### Repository
+The G14 repository provides optimized packages for ASUS ROG laptops.
 
-g14 repo contains all the tools you need on a ROG laptop precompiled for you. g14 is only a name and all tools from it apply to most ROG laptops Before adding the repo you need to add the repo sign key to your pacman-key. Run the following commands to add it:
+### Add repository GPG key:
 
 ```bash
 pacman-key --recv-keys 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
@@ -563,34 +563,39 @@ pacman-key --lsign-key 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
 pacman-key --finger 8F654886F17D497FEFE3DB448B15A6B0E9A3FA35
 ```
 
-```bash
-wget "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x8b15a6b0e9a3fa35" -O g14.sec
-sudo pacman-key -a g14.sec
-```
-
-
-After that to get the repo add to your /etc/pacman.conf at the end:
+### Add repository to pacman.conf:
 
 ```bash
+cat >> /etc/pacman.conf <<'EOF'
 [g14]
 Server = https://arch.asus-linux.org
+EOF
 ```
 
-After adding the repo run a full system update before you go to install tools from the repo:
+### Update package databases:
 
 ```bash
 pacman -Suy
 ```
 
-### Install the kernel and tools
+### Install G14 Kernel and Tools
 
 ```bash
 pacman -Sy linux-g14 linux-g14-headers asusctl supergfxctl
 ```
 
-## Boot Configuration
+Packages explained:
+- `linux-g14`: Kernel optimized for ASUS ROG laptops
+- `linux-g14-headers`: Headers for building kernel modules
+- `asusctl`: ASUS laptop control utility (fans, RGB, performance)
+- `supergfxctl`: Graphics switching for hybrid NVIDIA systems
 
-### Initramfs with Dracut
+>[!IMPORTANT]
+>We install the G14 kernel now before generating initramfs images. This ensures all two kernels (linux-lts, linux-g14) get proper boot entries.
+
+## Boot System Setup
+
+### Dracut Configuration
 
 **Create dracut configurations**:
 
@@ -622,7 +627,8 @@ EOF
 > **Core settings:**
 > - `hostonly="yes"`: Include only drivers/modules for current hardware
 > - `hostonly_mode="strict"`: Maximum reduction of initramfs size
-> - `compress="zstd -T0 -3"`: Multi-threaded compression, balance between speed and size
+> - `uefi="yes"`: Generate UEFI-bootable initramfs
+> - `compress="zstd"`: Use Zstandard compression (fast decompression)
 > - `loglevel=3`: Reduce boot verbosity (errors and warnings only)
 >
 > **Required modules:**
@@ -700,6 +706,9 @@ cat /etc/kernel/cmdline
 >- `rd.lvm.lv=`: LVM volume to activate
 >- `nvidia_drm.modeset=1`: Enable NVIDIA KMS
 
+>[!WARNING]
+>The kernel command line must be a single line with no line breaks.
+
 ### Unified Kernel Images (UKI)
 
 **Install systemd-boot**:
@@ -732,6 +741,7 @@ EOF
 >[!NOTE]
 >- `default @saved`: Boot last-used entry
 >- `timeout 3`: 3 second menu delay
+>- `console-mode max`: Use maximum screen resolution
 >- `editor no`: Disable kernel parameter editing (security)
 
 
@@ -851,7 +861,7 @@ rmdir /mnt/win-esp
 >After copying, you can boot Windows either through:
 >1. systemd-boot menu (if it auto-detected the Windows entry)
 >2. Firmware boot menu (F8/F12/Del during boot)
->3. Manual EFI boot entry (see troubleshooting section)
+>3. Manual EFI boot entry
 
 ## System Services
 
@@ -940,7 +950,7 @@ Verify the installation was successful:
 yay --version
 ```
 
-### Generate a new initramfs on kernel upgrade
+### Generate a new initramfs on kernel upgrade with dracut-ukify
 
 Go to: [dracut-ukify-configuration](./dracut-ukify-configuration.md)
 
@@ -951,15 +961,15 @@ If using nested encryption or VM storage:
 **Encrypted data volume**:
 
 ```bash
-cryptsetup open /dev/mapper/leo--os-data cryptdata
-mount --mkdir /dev/mapper/cryptdata /data -o noatime,nodev,nosuid,noexec
+sudo cryptsetup open /dev/mapper/leo--os-data cryptdata
+sudo mount --mkdir /dev/mapper/cryptdata /data -o noatime,nodev,nosuid,noexec
 ```
 
 **VM storage**:
 
 ```bash
-cryptsetup open /dev/nvme0n1p3 cryptvms
-mount --mkdir /dev/mapper/leo--vms-vms /vms -o noatime,discard=async
+sudo cryptsetup open /dev/nvme0n1p3 cryptvms
+sudo mount --mkdir /dev/mapper/leo--vms-vms /vms -o noatime,discard=async
 ```
 
 Add to `/etc/fstab` for automatic mounting:
@@ -975,7 +985,8 @@ Add to `/etc/fstab` for automatic mounting:
 ### Enable Essential Service
 
 ```bash
-systemctl enable fstrim.timer
+sudo systemctl enable fstrim.timer
+sudo systemctl enable supergfxd.service
 ```
 
 >[!NOTE]
@@ -1061,7 +1072,6 @@ cryptsetup luksHeaderRestore /dev/nvme1n1p3 --header-backup-file /root/cryptvms.
 - [Arch Wiki: Dual Boot with Windows](https://wiki.archlinux.org/title/Dual_boot_with_Windows)
 - [Arch Wiki: Power Management](https://wiki.archlinux.org/title/Power_management)
 - [Arch Wiki: Laptop](https://wiki.archlinux.org/title/Laptop)
-- 
 
 ## License
 
