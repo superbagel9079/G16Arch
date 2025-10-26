@@ -1,96 +1,227 @@
-## Install dracut-ukify
+## Table of Contents
+
+1. Installation
+2. Configuration Overview
+3. Configuration File Setup
+4. Hook Management
+5. Initramfs Generation
+
+## Installation
+
+### Install dracut-ukify Package
 
 ```bash
 yay -S dracut-ukify
 ```
 
-### Configure dracut-ukify
+>[!NOTE]
+>The dracut-ukify package is the modern approach for generating unified kernel images using systemd-ukify. It automatically creates EFI-executable initramfs images that systemd-boot can detect without additional boot entries.
+
+### Configuration Overview
+
+**Key features**:
+- Generates unified kernel images (UKI) as single EFI executables
+- Integrates kernel, initramfs, and command line into one file
+- Supports Secure Boot signing
+- Automatic systemd-boot integration
+- No separate boot loader entries needed
+
+**Generated UKI location**:
 
 ```bash
+/boot/EFI/Linux/linux-<version>-<machine_id>-<build_id>.efi
+```
+
+## Configuration File Setup
+
+### Create Main Configuration
+
+**Get system UUID first**:
+
+```bash
+blkid -o value -s UUID /dev/nvme1n1p2
+```
+
+**Edit configuration file**:
+
+```bash
+sudo vim /etc/dracut-ukify.conf
+```
+
+```
 # Configuration file for dracut-ukify package
 
-# Should dracut-ukify colorize its output?
-# Can be auto, true or false
+# ============================================================================
+# Output Configuration
+# ============================================================================
+
+# Colorize output (auto, true, or false)
 colorize=auto
 
-# Kernel package to be set as default in systemd-boot
-# eg. setting this to 'linux' is equivalent of calling
-# 'bootctl set-default ENTRY_ID_FOR_LINUX' after each upgrade of corresponding package
-#default_kernel_package='linux'
+# ============================================================================
+# Boot Entry Configuration
+# ============================================================================
 
-# Add global ukify flags to each invocation
-# See '/usr/lib/systemd/ukify --help' for an available flags
-# 1. Specify cmdline
-#    Alternatively, cmdline can be specified in /etc/kernel/cmdline
-#    If no cmdline was found, /proc/cmdline will be used
-# ukify_global_args+=(--cmdline "root=/dev/sda1 quiet")
-ukify_global_args+=(--cmdline "rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard=no,password-echo=no,timeout=30s,tries=3 nvidia_drm.modeset=1 loglevel=3 quiet")
-# 2. Sign UKI image for use with UEFI Secure Boot
-# ukify_global_args+=(--secureboot-private-key /usr/share/secureboot/keys/db/db.key --secureboot-certificate /usr/share/secureboot/keys/db/db.pem)
+# Set default kernel package in systemd-boot
+# Uncomment and set to your preferred kernel (linux, linux-lts, linux-g14)
+#default_kernel_package='linux-lts'
+
+# ============================================================================
+# Kernel Command Line
+# ============================================================================
+
+# IMPORTANT: Replace UUID_HERE with actual UUID from blkid command above
+# Kernel command line is specified here via --cmdline flag
+# Do NOT create /etc/kernel/cmdline as it would conflict
+
+ukify_global_args+=(--cmdline "rd.luks.name=UUID_HERE=cryptos rd.lvm.lv=leo-os/root root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard,timeout=30,tries=3 nvidia_drm.modeset=1 loglevel=3 quiet")
+
+# ============================================================================
+# Secure Boot Configuration
+# ============================================================================
+
+# Sign UKI images for UEFI Secure Boot
+# Requires sbctl keys to exist at these paths
+# Verify with: ls -l /var/lib/sbctl/keys/db/
+# If keys don't exist, run: sbctl create-keys
+
 ukify_global_args+=(--sign-kernel --secureboot-private-key /var/lib/sbctl/keys/db/db.key --secureboot-certificate /var/lib/sbctl/keys/db/db.pem)
-# 3. Add splash image (only BMP supported!)
+
+# ============================================================================
+# Optional Features
+# ============================================================================
+
+# Add splash screen (BMP format only)
 #ukify_global_args+=(--splash /usr/share/systemd/bootctl/splash-arch.bmp)
-# 4. Use systemd-sbsign to sign binaries for secure boot, requires systemd>=257
-#    --(no-)sign-kernel required for now, as it forces to skip verify phase, which is not supported by systemd-sbsign
+
+# Use systemd-sbsign (requires systemd>=257)
 #ukify_global_args+=(--signtool=systemd-sbsign --no-sign-kernel)
 
-# Build variants can be declared here
-# ukify_variants is are associative array where the key is variant name and value is dracut options to pass during generation
-# Note the "default" key is special - it will be omitted in the resulting image name
-# It can be used to create fallback images, for example:
+# ============================================================================
+# Build Variants
+# ============================================================================
+
+# Define image variants
+# Key "default" is special - omitted from resulting image name
+# Example with fallback:
 # ukify_variants=(
-#  [default]="--hostonly"
-#  [fallback]="--no-hostonly"
+#   [default]="--hostonly"
+#   [fallback]="--no-hostonly"
 # )
+
 ukify_variants=(
   [default]="--hostonly"
 )
 
-# Override UKI image path for each variant
+# ============================================================================
+# Install Path Configuration
+# ============================================================================
+
+# UKI installation path for each variant
 # Available variables:
-# ${name} - package name (linux, linux-lts, linux-zen, etc)
-# ${version} - package version
-# ${machine_id} - machine id (taken from /etc/machine-id)
-# ${build_id} - build id (taken from /etc/os-release, for ArchLinux it's always 'rolling')
-# ${id} - os id (taken from /etc/os-release, for ArchLinux it's always 'arch')
-# ${esp} - ESP partition mount path (e.g. /efi or /boot/efi)
-# ${boot} - XBOOTLDR partition mount path, or ESP if there is none
-# Note: that's not real shell variable expansion, it's just string substitution, so the parentheses are required
-# Note 2: unless you're using only one kernel package, you must provide unique paths for each package,
-#         so either ${name} or ${version} is strongly recommended to use here
-# Note 3: you can use absolute or relative paths here, in the latter case ESP mount path will be prepended automatically.
-#ukify_install_path=(
-#  [default]='EFI/Linux/linux-${version}-${machine_id}-${build_id}.efi'
-#  [fallback]='${boot}/EFI/Linux/linux-${version}-${machine_id}-${build_id}-fallback.efi'
-#)
+#   ${name}       - Package name (linux, linux-lts, linux-zen, etc)
+#   ${version}    - Package version
+#   ${machine_id} - Machine ID from /etc/machine-id
+#   ${build_id}   - Build ID from /etc/os-release (ArchLinux: 'rolling')
+#   ${id}         - OS ID from /etc/os-release (ArchLinux: 'arch')
+#   ${esp}        - ESP partition mount path
+#   ${boot}       - XBOOTLDR partition mount path, or ESP if none exists
 
 ukify_install_path=(
-  [default]='EFI/Linux/linux-${version}-${machine_id}-${build_id}.efi'
+  [default]='EFI/Linux/${id}-${name}-${version}.efi'
 )
 
-# Override kernel cmdline per variant
-# It can be used to define each variant it's own cmdline, for example:
+# ============================================================================
+# Per-Variant Command Line Override
+# ============================================================================
+
+# Override kernel cmdline per variant (optional)
+# Example:
 #ukify_cmdline=(
-#  [default]='root=/dev/sda1 quiet'
-#  [fallback]='root=/dev/sda1'
+#  [default]='root=/dev/mapper/leo--os-root quiet'
+#  [fallback]='root=/dev/mapper/leo--os-root'
 #)
 ```
 
-The dracut-ukifyAUR package is the modern way to generate a unified kernel image using systemd-ukify. Unlike the methods below, you can sign your whole kernel image including the initramfs by configuring the key and cert in /etc/dracut-ukify.conf (Note that it cannot use them if configured in dracut 's config folder). It's able to generate initramfs images that are EFI-executable (i.e. esp/EFI/Linux/linux-kernel-machine_id-build_id.efi). EFI binaries in this directory are automatically detected by systemd-boot and therefore do not need an entry in /boot/loader/loader.conf. Note that when using these, the 90-dracut-install hook may still generate non-EFI initramfs images in /boot/, such as initramfs-linux.img. These may not be used for anything and therefore waste space in the ESP partition. To stop these images from being created, run touch /etc/pacman.d/hooks/90-dracut-install.hook as root.
+>[!IMPORTANT]
+>You **must** replace UUID_HERE with the actual UUID from your encrypted partition. Get it with:
+>```bash
+>blkid -o value -s UUID /dev/nvme1n1p2
+>```
+
+## Hook Management
+
+When using `dracut-ukify`, the traditional `90-dracut-install` hook may still generate non-UKI initramfs images in `/boot/`, such as `initramfs-linux.img`. These files:
+
+- Are not used by systemd-boot when UKI images exist
+- Waste space on the ESP partition
+- Create confusion about which initramfs is actually being used
+- Are redundant since UKI images already contain the initramfs
+
+### Disable Traditional dracut-ukify Hook
+
+Simply run:
 
 ```bash
 sudo touch /etc/pacman.d/hooks/90-dracut-install.hook
 ```
 
-### Remove the old /etc/kernel/cmdline and /etc/kernel/install.conf
+### Remove Conflicting Configuration Files
+
+**Clean up old kernel configuration**:
 
 ```bash
-sudo rm -f /etc/kernel/cmdline /etc/kernel/install.conf
+[[ -f /etc/kernel/cmdline ]] && sudo rm /etc/kernel/cmdline
+[[ -f /etc/kernel/install.conf ]] && sudo rm /etc/kernel/install.conf
 ```
 
-### Regenrate the initramfs
+>[!TIP]
+>The `--cmdline` flag in `/etc/dracut-ukify.conf` takes precedence over `etc/kernel/cmdline`. Removing old files prevents confusion but isn't strictly necessary.
+
+## Initramfs Generation
+
+### Trigger UKI Generation
+
+**Reinstall kernel packages to trigger hooks**:
 
 ```bash
 sudo pacman -S linux-g14 linux-lts
+```
 
+### Verify UKI Creation
 
+**Check generated UKI files**:
+
+```bash
+ls -lh /boot/EFI/Linux/
+```
+
+**Expected output**:
+
+```bash
+arch-linux-g14-<version>.efi
+arch-linux-lts-<version>.efi
+```
+
+**Verify boot entries**:
+
+```bash
+bootctl list
+```
+
+>[!NOTE]
+>Each UKI is a complete, self-contained bootable image. No separate initramfs files, no boot loader configuration files, and no command line stored separately. Everything is embedded in one signed EFI executable.
+
+## Resources
+
+### Official Documentation
+
+- [Arch Wiki: Unified Kernel Image](https://wiki.archlinux.org/title/Unified_kernel_image)
+- [dracut-ukify AUR Package](https://aur.archlinux.org/packages/dracut-ukify)
+- [systemd-ukify Manual](https://man.archlinux.org/man/ukify.1)
+- [dracut Manual](https://man.archlinux.org/man/dracut.8)
+
+### Related Guides
+
+- [Arch Wiki: Secure Boot](https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot)
+- [Arch Wiki: systemd-boot](https://wiki.archlinux.org/title/Systemd-boot)
