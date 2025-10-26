@@ -14,13 +14,12 @@
 12. [Install G14 Repository](#install-g14-repository)
 13. [Boot Configuration](#boot-configuration)
 14. [Pacman Configuration](#pacman-configuration)
-15. [Pacman Hooks](#pacman-hooks)
-16. [Secure Boot Setup](#secure-boot-setup)
-17. [System Services](#system-services)
-18. [Finalization](#finalization)
-19. [Post-Installation Tasks](#post-installation-tasks)
-20. [Maintenance](#maintenance)
-21. [Resources](#ressources)
+15. [Secure Boot Setup](#secure-boot-setup)
+16. [System Services](#system-services)
+17. [Finalization](#finalization)
+18. [Post-Installation Tasks](#post-installation-tasks)
+19. [Maintenance](#maintenance)
+20. [Resources](#ressources)
 
 ## Prerequisites
 **Hardware**:
