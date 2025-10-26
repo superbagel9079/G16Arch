@@ -1,10 +1,10 @@
 ## Table of Contents
 
-1. Installation
-2. Configuration Overview
-3. Configuration File Setup
-4. Hook Management
-5. Initramfs Generation
+1. [Installation](installation)
+2. [Configuration Overview](configuration-overview)
+3. [Configuration File Setup](configuration-file-setup)
+4. [Hook Management](hook-management)
+5. [Initramfs Generation](initramfs-generation)
 
 ## Installation
 
