@@ -12,15 +12,14 @@
 10. [Base System Installation](#base-system-installation)
 11. [System Configuration](#system-configuration)
 12. [Boot Configuration](#boot-configuration)
-13. [Secure Boot Setup](#secure-boot-setup)
-14. [Package Management](#package-managment)
-15. [Pacman Hooks](#pacman-hooks)
-16. [Secure Boot Setup](#secure-boot-setup)
-17. [System Services](#system-services)
-18. [Finalization](#finalization)
-19. [Post-Installation Tasks](#post-installation-tasks)
-20. [Maintenance](#maintenance)
-21. [Resources](#ressources)
+13. [Package Management](#package-managment)
+14. [Pacman Hooks](#pacman-hooks)
+15. [Secure Boot Setup](#secure-boot-setup)
+16. [System Services](#system-services)
+17. [Finalization](#finalization)
+18. [Post-Installation Tasks](#post-installation-tasks)
+19. [Maintenance](#maintenance)
+20. [Resources](#ressources)
 
 ## Prerequisites
 **Hardware**:
