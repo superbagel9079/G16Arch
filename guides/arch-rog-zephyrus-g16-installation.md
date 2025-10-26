@@ -942,7 +942,7 @@ yay --version
 
 ### Generate a new initramfs on kernel upgrade
 
-Go to: [dracut-ukify-configuration]()
+Go to: [dracut-ukify-configuration](./guides/dracut-ukify-configuration.md)
 
 ### Mount Additional Volumes
 
