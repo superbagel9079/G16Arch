@@ -82,3 +82,15 @@ The dracut-ukifyAUR package is the modern way to generate a unified kernel image
 sudo touch /etc/pacman.d/hooks/90-dracut-install.hook
 ```
 
+### Remove the old /etc/kernel/cmdline and /etc/kernel/install.conf
+
+```bash
+sudo rm -f /etc/kernel/cmdline /etc/kernel/install.conf
+```
+
+### Regenrate the initramfs
+
+```bash
+sudo pacman -S linux-g14 linux-lts
+
+
