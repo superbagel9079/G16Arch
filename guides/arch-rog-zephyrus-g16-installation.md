@@ -13,7 +13,7 @@
 11. [System Configuration](#system-configuration)
 12. [Install G14 Repository](#install-g14-repository)
 13. [Boot Configuration](#boot-configuration)
-14. [Package Management](#package-managment)
+14. [Package Configuration](#package-configuration)
 15. [Pacman Hooks](#pacman-hooks)
 16. [Secure Boot Setup](#secure-boot-setup)
 17. [System Services](#system-services)
