@@ -226,3 +226,7 @@ bootctl list
 
 - [Arch Wiki: Secure Boot](https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot)
 - [Arch Wiki: systemd-boot](https://wiki.archlinux.org/title/Systemd-boot)
+
+## License
+
+Documentation provided as-is for educational purposes.
