@@ -434,7 +434,7 @@ Expected output:
 /dev/mapper/leo--os-root on /mnt type ext4
 /dev/mapper/leo--os-var on /mnt/var type ext4
 /dev/mapper/leo--os-home on /mnt/home type ext4
-/dev/nvme0n1p1 on /mnt/boot type vfat
+/dev/nvme1n1p1 on /mnt/boot type vfat
 ```
 
 ## Base System Installation
