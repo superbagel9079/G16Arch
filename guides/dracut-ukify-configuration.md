@@ -75,3 +75,10 @@ ukify_install_path=(
 #  [fallback]='root=/dev/sda1'
 #)
 ```
+
+The dracut-ukifyAUR package is the modern way to generate a unified kernel image using systemd-ukify. Unlike the methods below, you can sign your whole kernel image including the initramfs by configuring the key and cert in /etc/dracut-ukify.conf (Note that it cannot use them if configured in dracut 's config folder). It's able to generate initramfs images that are EFI-executable (i.e. esp/EFI/Linux/linux-kernel-machine_id-build_id.efi). EFI binaries in this directory are automatically detected by systemd-boot and therefore do not need an entry in /boot/loader/loader.conf. Note that when using these, the 90-dracut-install hook may still generate non-EFI initramfs images in /boot/, such as initramfs-linux.img. These may not be used for anything and therefore waste space in the ESP partition. To stop these images from being created, run touch /etc/pacman.d/hooks/90-dracut-install.hook as root.
+
+```bash
+sudo touch /etc/pacman.d/hooks/90-dracut-install.hook
+```
+
