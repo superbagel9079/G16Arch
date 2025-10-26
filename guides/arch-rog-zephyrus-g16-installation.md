@@ -255,7 +255,7 @@ cryptsetup open --persistent /dev/nvme1n1p2 cryptos
 ```
 
 >[!note]
->The `--persistent` flag stores the mapping in `/etc/crypttab.initramfs`, ensuring consistent device mapper names across reboots when handled by dracut.
+>The `--persistent` flag only makes the device mapper entry survive udev changes during the same session. It has nothing to do with dracut or persistent configuration files.
 
 ### Configure LUKS2 for VM Partition (Optional)
 
@@ -686,7 +686,7 @@ echo "System LUKS UUID: $SYSUUID"
 **Create kernel command line**:
 
 ```bash
-install -Dm0644 /dev/stdin /etc/kernel/cmdline <<'EOF'
+install -Dm0644 /dev/stdin /etc/kernel/cmdline <<EOF
 rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard=no,password-echo=no,timeout=30s,tries=3 nvidia_drm.modeset=1 loglevel=3 quiet
 EOF
 ```
@@ -816,8 +816,7 @@ sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
 **Sign both kernel UKIs**:
 
 ```bash
-# Regenerate the initramfs
-pacman -S linux-g14 linux-lts
+sbctl sign -s /boot/EFI/Linux/*.efi
 ```
 
 **Verify signatures**:
@@ -967,7 +966,7 @@ sudo mount --mkdir /dev/mapper/cryptdata /data -o noatime,nodev,nosuid,noexec
 **VM storage**:
 
 ```bash
-sudo cryptsetup open /dev/nvme0n1p3 cryptvms
+sudo cryptsetup open /dev/nvme1n1p3 cryptvms
 sudo mount --mkdir /dev/mapper/leo--vms-vms /vms -o noatime,discard=async
 ```
 
