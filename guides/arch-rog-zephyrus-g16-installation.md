@@ -26,7 +26,9 @@
 - ASUS ROG Zephyrus G16
 - 32GB RAM
 - NVIDIA RTX 4070 (8GB VRAM)
-- NVMe SSD (identified as /dev/nvme0n1)
+- Two NVMe SSDs:
+  - /dev/nvme0n1 (Windows - DO NOT MODIFY)
+  - /dev/nvme1n1 (Linux target - will be erased)
 
 **Requirements**:
 - UEFI firmware (not Legacy BIOS)
@@ -36,7 +38,7 @@
 
 
 >[!WARNING]
->This guide will **completely erase** `/dev/nvme0n1`. Back up all data before proceeding. Verify your target drive with `lsblk -d | grep disk`.
+>This guide will **completely erase** `/dev/nvme1n1`. Back up all data before proceeding. Verify your target drive with `lsblk -d | grep disk`.
 
 >[!TIP]
 >Confirm UEFI boot mode: ls `/sys/firmware/efi/efivars` should show files. If the directory doesn't exist, you booted in Legacy mode.
@@ -251,11 +253,8 @@ cryptsetup luksFormat --type luks2 \
 **Open encrypted container**:
 
 ```bash
-cryptsetup open --persistent /dev/nvme1n1p2 cryptos
+cryptsetup open /dev/nvme1n1p2 cryptos
 ```
-
->[!note]
->The `--persistent` flag only makes the device mapper entry survive udev changes during the same session. It has nothing to do with dracut or persistent configuration files.
 
 ### Configure LUKS2 for VM Partition (Optional)
 
@@ -270,7 +269,7 @@ cryptsetup luksFormat --type luks2 \
   /dev/nvme1n1p3
 
 # Open encrypted container
-cryptsetup open --persistent /dev/nvme1n1p3 cryptvms
+cryptsetup open /dev/nvme1n1p3 cryptvms
 ```
 
 >[!TIP]
@@ -352,7 +351,7 @@ cryptsetup luksFormat --type luks2 \
   /dev/mapper/leo--os-data
 
 # Open encrypted data volume
-cryptsetup open --persistent /dev/mapper/leo--os-data cryptdata
+cryptsetup open /dev/mapper/leo--os-data cryptdata
 ```
 
 >[!NOTE]
@@ -589,8 +588,12 @@ Packages explained:
 - `asusctl`: ASUS laptop control utility (fans, RGB, performance)
 - `supergfxctl`: Graphics switching for hybrid NVIDIA systems
 
->[!IMPORTANT]
->We install the G14 kernel now before generating initramfs images. This ensures all two kernels (linux-lts, linux-g14) get proper boot entries.
+>[!NOTE]
+>You now have two kernels installed:
+>- `linux-lts`: Long-term stable kernel (safer for production)
+>- `linux-g14`: ASUS-optimized kernel (better hardware support)
+>
+>Both will get UKI entries. Use LTS if G14 has issues.
 
 ## Boot System Setup
 
@@ -767,8 +770,6 @@ You should see:
 >[!warning]
 >Do not manually run `dracut --uefi` for the same kernel version. `The kernel-install` command already handles UKI generation through dracut and ukify integration.
 
-### Package Management
-
 ## Pacman Configuration
 
 ```bash
@@ -831,6 +832,13 @@ All files should show "Signed."
 
 Since Windows is on a separate disk with its own ESP, we need to access it:
 
+>[!WARNING]
+>Copying the Windows bootloader is optional. You can always boot Windows by:
+>1. Using firmware boot menu (F8/F12/Del key during boot)
+>2. Setting nvme0n1 as first boot device in UEFI settings
+>
+>Only copy if you want Windows accessible from systemd-boot menu.
+
 ```bash
 # Create temporary mount point
 mkdir -p /mnt/win-esp
@@ -854,12 +862,6 @@ rmdir /mnt/win-esp
 >- Your firmware will default to the disk you select in boot menu
 >- Having both bootloaders on Linux ESP allows systemd-boot to chain-load Windows
 >- This gives you a unified boot menu instead of using firmware boot selection
-
->[!TIP]
->After copying, you can boot Windows either through:
->1. systemd-boot menu (if it auto-detected the Windows entry)
->2. Firmware boot menu (F8/F12/Del during boot)
->3. Manual EFI boot entry
 
 ## System Services
 
