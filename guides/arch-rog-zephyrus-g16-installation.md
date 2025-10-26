@@ -548,6 +548,19 @@ EOF
 >[!WARNING]
 >Always verify sudoers syntax: `visudo -c`. Syntax errors can lock you out of sudo.
 
+### Configure iwd as wifi backend:
+
+```bash
+sudo mkdir -p /etc/NetworkManager/conf.d/
+sudo tee /etc/NetworkManager/conf.d/wifi_backend.conf > /dev/null <<'EOF'
+[device]
+wifi.backend=iwd
+EOF
+```
+
+>[!NOTE]
+>Using iwd as the wifi backend provides better performance and stability compared to the default wpa_supplicant backend, especially on modern wireless chipsets.
+
 ## Install G14 Repository
 
 The G14 repository provides optimized packages for ASUS ROG laptops.
@@ -1058,6 +1071,7 @@ cryptsetup luksHeaderRestore /dev/nvme1n1p3 --header-backup-file /root/cryptvms.
 - [Arch Wiki: Unified Extensible Firmware Interface/Secure Boot](https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot)
 - [Arch Wiki: NVIDIA](https://wiki.archlinux.org/title/NVIDIA)
 - [Arch Wiki: DKMS Support](https://wiki.archlinux.org/title/Dynamic_Kernel_Module_Support)
+- [Arch Linux: Network Manager](https://wiki.archlinux.org/title/NetworkManager)
 
 ### Tools Documentation
 
