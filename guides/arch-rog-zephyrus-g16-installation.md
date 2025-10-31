@@ -619,7 +619,6 @@ install -Dm0644 /dev/stdin /etc/dracut.conf.d/00-global.conf <<'EOF'
 hostonly="yes"
 hostonly_mode="strict"
 uefi="yes"
-loglevel=3
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/05-compress.conf <<'EOF'
@@ -628,6 +627,7 @@ EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/10-modules.conf <<'EOF'
 add_dracutmodules+=" crypt lvm busybox i18n "
+omit_dracutmodules+=" brltty "
 EOF
 
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/20-drivers.conf <<'EOF'
@@ -671,22 +671,6 @@ EOF
 >[!NOTE]
 >**Why blacklist Nouveau?** The proprietary NVIDIA driver conflicts with the open-source Nouveau driver. Both cannot control the GPU simultaneously.
 
-**Configure NVIDIA KMS**:
-
-```bash
-install -Dm0644 /dev/stdin /etc/modprobe.d/10-nvidia-kms.conf <<'EOF'
-options nvidia_drm modeset=1 fbdev=1
-options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_TemporaryFilePath=/var/tmp
-EOF
-```
-
->[!NOTE]
->**NVIDIA options**:
->- `modeset=1`: Enable kernel mode setting (better graphics)
->- `fbdev=1`: Framebuffer device support
->- `NVreg_PreserveVideoMemoryAllocations=1`: Required for suspend/resume
->- `NVreg_TemporaryFilePath=/var/tmp`: Alternative temp location
-
 ### Kernel Command Line
 
 **Get system LUKS UUID**:
@@ -703,7 +687,7 @@ echo "System LUKS UUID: $SYSUUID"
 
 ```bash
 install -Dm0644 /dev/stdin /etc/kernel/cmdline <<EOF
-rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard=no,password-echo=no,timeout=30s,tries=3 nvidia_drm.modeset=1 loglevel=3 quiet
+rd.luks.name=${SYSUUID}=cryptos rd.lvm.lv=leo-os/root rd.lvm.lv=leo-os/swap root=/dev/mapper/leo--os-root rootfstype=ext4 rd.luks.options=discard=no,password-echo=no,timeout=30s,tries=3 loglevel=3 quiet
 EOF
 ```
 
