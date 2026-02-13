@@ -1799,7 +1799,7 @@ Expected output: every listed file should show a status of **Signed**. If any fi
 
 This is the final chapter of the installation. We enable the daemons that provide runtime functionality, then perform a clean dismount sequence that ensures every buffer is flushed, every filesystem is cleanly unmounted, and every encrypted volume is properly closed before the first boot.
 
-## Part I — Enable Essential Services
+## Part I - Enable Essential Services
 
 These services are **enabled** (scheduled to start at boot) but not **started** — we are still inside a chroot with no active init system. They will activate on the first real boot.
 
@@ -1966,3 +1966,417 @@ reboot
 > 
 > Any failures at this stage should be investigated before proceeding to install a desktop environment, window manager, or additional software.
 
+# Chapter X - Automated UKI Pipeline Migration (`dracut-ukify`)
+
+> [!Abstract] 
+> **Chapter Objective**
+> 
+> Chapter VII established the boot payload through manual `dracut` invocations — a functional but operator-dependent process. Each kernel update required manual regeneration of the Unified Kernel Images, manual re-signing via `sbctl`, and manual verification. This chapter replaces that entire workflow with an automated pipeline driven by `dracut-ukify`, a pacman hook layer built on `systemd-ukify`.
+> 
+> After completing this chapter, every kernel installation or upgrade will automatically:
+> 
+> A - Invoke `dracut` with your existing module, compression, and driver configurations. 
+> B - Pipe the output through `systemd-ukify` to assemble a Unified Kernel Image. 
+> C - Embed the kernel command line (LUKS UUID, root UUID, boot parameters). 
+> D - Sign the UKI with your Secure Boot database key at build time. 
+> E - Place the resulting `.efi` binary in `/boot/EFI/Linux/` where `systemd-boot` auto-discovers it.
+> 
+> Zero manual intervention. Zero unsigned intermediaries.
+
+## Part I - Context and Rationale
+
+### A - What Changes
+
+|Aspect|Chapter VII (Manual)|Chapter X (Automated)|
+|---|---|---|
+|UKI generation trigger|Manual `dracut` invocation after each kernel update|Pacman hook fires automatically on kernel install/upgrade|
+|Command line source|`/etc/dracut.conf.d/30-cmdline.conf` (read by `dracut`)|`--cmdline` flag in `/etc/dracut-ukify.conf` (passed to `ukify`)|
+|Secure Boot signing|Separate `sbctl sign` step after generation|Integrated into the build — `ukify` signs during assembly|
+|Signing key location|Referenced by `sbctl` from `/var/lib/sbctl/keys/db/`|Same keys, but declared in `/etc/dracut-ukify.conf`|
+|Risk of forgetting a step|High — any missed command leaves an unsigned or stale UKI|None — the hook chain is deterministic|
+
+### B - What Does Not Change
+
+Your existing dracut drop-in configurations in `/etc/dracut.conf.d/` remain fully operational. `dracut-ukify` invokes `dracut` internally and respects these files for module selection, compression, and driver loading. The LUKS2 encryption, Btrfs subvolume layout, NVIDIA early loading, and systemd-boot configuration from previous chapters are entirely unaffected.
+
+## Part II - AUR Helper Installation
+
+`dracut-ukify` is hosted on the AUR (Arch User Repository). Building AUR packages requires an AUR helper — we use `yay`.
+
+> [!WARNING] 
+> **AUR Packages Must Never Be Built as Root**
+> 
+> The `makepkg` utility refuses to execute under UID 0. Every command in this Part must be run as your regular user account (created in Chapter VI). If you are currently in a root shell:
+> 
+> ```bash
+> su - <your-username>
+> ```
+> 
+> ```bash
+git clone https://aur.archlinux.org/yay-bin.git
+cd yay-bin
+makepkg -si
+cd ..
+rm -rf yay-bin
+>```
+
+> [!NOTE] 
+> **Command Breakdown**
+> 
+| Command                    | Effect                                                                                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `git clone ...yay-bin.git` | Downloads the PKGBUILD for the precompiled `yay` binary. The `-bin` variant skips compiling Go from source — identical functionality, faster installation. |
+| `makepkg -si`              | `-s` resolves and installs build dependencies automatically. `-i` installs the resulting package via `pacman` after a successful build.                    |
+| `rm -rf yay-bin`           | Removes the build directory. It served its purpose and is no longer needed.                                                                                |
+
+> [!TIP] 
+> **Why `yay-bin` and Not `yay`?**
+> 
+> The `yay` PKGBUILD compiles the helper from Go source, pulling the entire Go toolchain (~300 MB) as a build dependency. `yay-bin` ships a precompiled static binary — functionally identical, significantly faster to install, and avoids transient dependencies that serve no purpose after the build completes.
+> 
+> Reference: AUR — yay-bin ([https://aur.archlinux.org/packages/yay-bin](https://aur.archlinux.org/packages/yay-bin))
+
+## Part III - Install `dracut-ukify`
+
+```bash
+yay -S dracut-ukify
+```
+
+> [!Abstract] 
+> **What This Package Provides**
+> 
+> `dracut-ukify` ships a pacman hook that intercepts kernel package transactions. On every kernel install or upgrade, instead of the default `90-dracut-install.hook` (which produces a bare `initramfs-*.img` that `systemd-boot` ignores), it invokes `dracut` piped through `systemd-ukify` to produce a Unified Kernel Image — a single `.efi` PE binary containing the kernel, initramfs, CPU microcode, and embedded command line. The output is placed directly in `/boot/EFI/Linux/`, where `systemd-boot` auto-discovers it without requiring manual loader entries.
+> 
+> Signing keys can be specified in `/etc/dracut-ukify.conf` — the package's own configuration file. **They cannot be read from dracut's configuration folder** (`/etc/dracut.conf.d/`). This distinction is the single most common source of unsigned UKI errors.
+> 
+> Reference: AUR — dracut-ukify ([https://aur.archlinux.org/packages/dracut-ukify](https://aur.archlinux.org/packages/dracut-ukify))
+
+## Part IV - Retrieve Your Kernel Command Line
+
+Before writing the new configuration, retrieve the kernel command line defined in Chapter VII:
+
+```bash
+cat /etc/dracut.conf.d/30-cmdline.conf
+```
+
+> [!NOTE] 
+> **What You Are Looking For**
+> 
+> The file contains a `kernel_cmdline=` directive with content resembling:
+>
+> ```
+> kernel_cmdline="rd.luks.uuid=YOUR-LUKS-UUID-HERE root=UUID=YOUR-ROOT-UUID-HERE rootflags=subvol=@ rw quiet nvidia_drm.modeset=1"
+> ```
+> 
+> Copy the **values** (everything between the quotes). You will embed them into `/etc/dracut-ukify.conf` in Part V.
+
+> [!WARNING]
+>  **UUID Confusion Is the Most Common Boot Failure**
+> 
+> Two distinct UUIDs appear in this command line. They refer to different layers of the storage stack:
+> 
+| Parameter       | UUID Of                                                                         | How to Obtain               |
+| --------------- | ------------------------------------------------------------------------------- | --------------------------- |
+| `rd.luks.uuid=` | The **raw partition** `/dev/nvme1n1p2` — the LUKS2 container itself.            | `blkid /dev/nvme1n1p2`      |
+| `root=UUID=`    | The **Btrfs filesystem** inside the unlocked container (`/dev/mapper/cryptos`). | `blkid /dev/mapper/cryptos` |
+> Swapping these two values is a silent, unrecoverable misconfiguration: dracut will search for a LUKS container whose UUID matches a Btrfs filesystem, find nothing, and drop to an emergency shell with no meaningful error message. Verify both with `blkid` before proceeding.
+
+## Part V - Configuration
+
+### A - Write `/etc/dracut-ukify.conf`
+
+```bash
+sudo nvim /etc/dracut-ukify.conf
+```
+
+The default configuration file ships fully commented. Rather than replacing its contents, we simply uncomment and modify the relevant directives. This preserves the upstream documentation embedded in the file for future reference.
+
+The following four blocks must be uncommented and adjusted:
+
+### B - Kernel Command Line (Block 1)
+
+Locate the commented `cmdline` example:
+
+```ini
+#ukify_global_args+=(--cmdline "root=/dev/sda1 quiet")
+```
+
+Uncomment it and replace the value with your actual boot parameters:
+
+```ini
+ukify_global_args+=(--cmdline "rd.luks.uuid=<LUKS_UUID> root=UUID=<ROOT_UUID> rootflags=subvol=@ rw quiet nvidia_drm.modeset=1")
+```
+
+> [!WARNING] 
+> **UUID Confusion Is the Most Common Boot Failure**
+> 
+> Two distinct UUIDs appear in this command line. They refer to different layers of the storage stack:
+> 
+| Parameter       | UUID Of                                                                        | How to Obtain               |
+| --------------- | ------------------------------------------------------------------------------ | --------------------------- |
+| `rd.luks.uuid=` | The **raw partition** `/dev/nvme1n1p2` — the LUKS2 container itself            | `blkid /dev/nvme1n1p2`      |
+| `root=UUID=`    | The **Btrfs filesystem** inside the unlocked container (`/dev/mapper/cryptos`) | `blkid /dev/mapper/cryptos` |
+> Swapping these two values is a silent, unrecoverable misconfiguration: dracut will search for a LUKS container whose UUID matches a Btrfs filesystem, find nothing, and drop to an emergency shell with no meaningful error message. Verify both with `blkid` before proceeding.
+
+> [!NOTE] 
+> **Parameter Reference**
+> 
+| Parameter              | Role                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `rd.luks.uuid=`        | Instructs dracut's `crypt` module to locate and unlock this LUKS2 container during early boot.                      |
+| `root=UUID=`           | Tells the kernel which filesystem to mount as `/` after LUKS is unlocked.                                           |
+| `rootflags=subvol=@`   | Mounts the `@` Btrfs subvolume as root — not the top-level subvolume (id 5), which contains no directory structure. |
+| `rw`                   | Mounts root read-write immediately, skipping the read-only → remount-rw transition.                                 |
+| `quiet`                | Suppresses verbose kernel messages during boot.                                                                     |
+| `nvidia_drm.modeset=1` | Enables NVIDIA DRM/KMS — required for Wayland compositors and early display initialization.                         |
+
+### C - Secure Boot Signing (Block 2)
+
+Locate the commented signing example:
+
+```ini
+#ukify_global_args+=(--secureboot-private-key /usr/share/secureboot/keys/db/db.key --secureboot-certificate /usr/share/secureboot/keys/db/db.pem)
+```
+
+Uncomment it and adjust the paths to point to `sbctl`'s key store:
+
+```ini
+ukify_global_args+=(--secureboot-private-key /var/lib/sbctl/keys/db/db.key --secureboot-certificate /var/lib/sbctl/keys/db/db.pem)
+```
+
+> [!WARNING] 
+> **The Default Path in the Comment Is Wrong for Our Setup**
+> 
+> The upstream example references `/usr/share/secureboot/keys/db/` — a common convention for manually generated keys. Our keys were generated by `sbctl` in Chapter VIII, which stores them under `/var/lib/sbctl/keys/db/`. Using the wrong path produces unsigned UKIs that Secure Boot will reject.
+> 
+> Verify the actual paths before writing:
+>
+> ```bash
+> ls -l /var/lib/sbctl/keys/db/
+> ```
+> 
+> You should see `db.key` (private key) and either `db.pem` or `db.crt` (certificate). If your system has `db.crt` instead of `db.pem`, adjust the `--secureboot-certificate` path accordingly — the file content is identical regardless of extension.
+
+> [!NOTE] 
+> **Why Signing Must Be Declared Here and Not in `/etc/dracut.conf.d/`**
+> 
+> `dracut-ukify` passes these flags directly to `systemd-ukify`, which handles the PE binary assembly and signing. The dracut configuration folder (`/etc/dracut.conf.d/`) controls dracut's internal behavior — module selection, compression, driver loading — but has no mechanism to forward arbitrary flags to `ukify`. Placing signing directives there has no effect, and the resulting UKIs will be generated unsigned with no error or warning.
+
+### D - Install Path (Block 3)
+
+Locate the commented install path example:
+
+```ini
+#ukify_install_path=(
+#  [default]='EFI/Linux/linux-${version}-${machine_id}-${build_id}.efi'
+#)
+```
+
+Uncomment it and simplify the naming scheme:
+
+```ini
+ukify_install_path=(
+  [default]='EFI/Linux/${id}-${name}-${version}.efi'
+)
+```
+
+> [!WARNING] 
+> **`${name}` Is Non-Negotiable for Dual-Kernel Setups**
+> 
+> Since we run two kernels (`linux-lts` and `linux-g14`), the install path **must** contain `${name}` or an equivalent variable that differentiates them. Without it, both kernels would produce the same filename and the second build would silently overwrite the first — leaving only one bootable kernel.
+
+> [!NOTE] 
+> **Variable Reference**
+> 
+|Variable|Resolves To|Example|
+|---|---|---|
+|`${id}`|OS identifier from `/etc/os-release`|`arch`|
+|`${name}`|Kernel package name|`linux-lts`, `linux-g14`|
+|`${version}`|Full kernel version string|`6.12.10-1-lts`|
+|`${machine_id}`|Contents of `/etc/machine-id`|`a1b2c3d4...` (32 hex characters)|
+|`${build_id}`|Build ID from `/etc/os-release`|`rolling` (always, on Arch)|
+>
+The default template includes `${machine_id}` and `${build_id}`, which produce unnecessarily long filenames without adding useful differentiation on a single-machine system. The simplified `${id}-${name}-${version}` scheme produces clean, readable entries:
+>```
+arch-linux-g14-6.12.10-1-g14.efi
+arch-linux-lts-6.12.10-1-lts.efi
+>```
+
+### E - Verify Signing Key Paths
+
+Confirm the Secure Boot keys exist at the expected locations before proceeding:
+
+```bash
+ls -l /var/lib/sbctl/keys/db/db.key /var/lib/sbctl/keys/db/db.pem
+```
+
+Both files must be present and readable. If `sbctl` generated a `.crt` extension instead of `.pem`, adjust the `--secureboot-certificate` path in the configuration accordingly:
+
+```bash
+ls /var/lib/sbctl/keys/db/
+```
+
+> [!TIP] 
+> **`.pem` vs `.crt` — No Functional Difference**
+> 
+> Both extensions denote X.509 certificates in PEM-encoded format (Base64-encoded ASN.1 DER wrapped in `-----BEGIN CERTIFICATE-----` / `-----END CERTIFICATE-----` delimiters). `ukify` accepts either. The file content is identical — only the extension differs. Check which one `sbctl` generated on your system and match it exactly in the configuration.
+
+## Part VI - Hook Management
+
+### A - Suppress the Default Dracut Hook
+
+The `dracut` package ships `90-dracut-install.hook`, which fires on kernel transactions and produces a bare `initramfs-*.img` in `/boot/`. This file is not a UKI — `systemd-boot` ignores it entirely (it only auto-discovers `.efi` files in `EFI/Linux/`). Allowing both hooks to run wastes ~60–120 MB of ESP space per kernel on orphaned images that serve no purpose:
+
+```bash
+sudo mkdir -p /etc/pacman.d/hooks
+sudo touch /etc/pacman.d/hooks/90-dracut-install.hook
+```
+
+> [!Abstract] 
+> **Why an Empty File Works as Suppression**
+> 
+> Pacman resolves hooks from two directories: `/usr/share/libalpm/hooks/` (package-provided, read-only) and `/etc/pacman.d/hooks/` (administrator overrides). When identically named files exist in both locations, the override directory takes **absolute precedence**. An empty file is a syntactically valid hook definition that contains no triggers and no actions — a deterministic no-op.
+> 
+> This is the Arch-sanctioned mechanism for disabling package-provided hooks without modifying files under `/usr/`, which would be overwritten on the next package update.
+> 
+> Reference: Arch Wiki — Pacman Hooks ([https://wiki.archlinux.org/title/Pacman#Hooks](https://wiki.archlinux.org/title/Pacman#Hooks))
+
+### B - Suppress `mkinitcpio` Hooks
+
+`mkinitcpio` was not in our `pacstrap` package set (Chapter V), but it may have been pulled as a dependency by another package. If present, its hooks generate competing `initramfs-*.img` files and execute cleanup logic on kernel removal that can interfere with UKI management:
+
+```bash
+sudo ln -sf /dev/null /etc/pacman.d/hooks/90-mkinitcpio-install.hook
+sudo ln -sf /dev/null /etc/pacman.d/hooks/60-mkinitcpio-remove.hook
+```
+
+> [!NOTE] 
+> **Two Suppression Mechanisms — When to Use Each**
+> 
+|Method|Mechanism|When to Use|
+|---|---|---|
+|`touch <hookname>`|Creates an empty but real file. Pacman parses it, finds no triggers, does nothing.|When you want the override to be visible and editable (you might add content later).|
+|`ln -sf /dev/null <hookname>`|Creates a symlink to the null device. Any read returns EOF immediately.|When you want a permanent, unambiguous "this hook is dead" signal. Slightly more explicit in intent.|
+> Both are functionally equivalent for suppression. The Arch Wiki uses symlinks for `mkinitcpio` and empty files for dracut. We follow their convention for consistency with upstream documentation.
+
+### C - Remove the Standalone Dracut Command Line Configuration
+
+In Chapter VII, `/etc/dracut.conf.d/30-cmdline.conf` was created to embed the kernel command line for manual `dracut --uefi` invocations. Now that `dracut-ukify` owns the command line via its `--cmdline` flag in `/etc/dracut-ukify.conf`, this file is redundant:
+
+```bash
+sudo rm -f /etc/dracut.conf.d/30-cmdline.conf
+```
+
+> [!WARNING] 
+> **Do Not Delete the Other Dracut Configuration Files**
+> 
+> Only `30-cmdline.conf` is removed. The remaining drop-in files are read by `dracut` (invoked internally by `dracut-ukify`) and control critical aspects of initramfs content:
+> 
+| File                   | Purpose                                                                                     | Status                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `00-optimization.conf` | `hostonly`, `compress=zstd`, `early_microcode`, performance tuning                          | **Keep** — controls initramfs content and compression.                           |
+| `10-modules.conf`      | `add_dracutmodules`, `omit_dracutmodules`                                                   | **Keep** — ensures `crypt`, `btrfs`, `systemd` modules are included.             |
+| `20-graphics.conf`     | `force_drivers` for NVIDIA modules (`nvidia`, `nvidia_modeset`, `nvidia_uvm`, `nvidia_drm`) | **Keep** — ensures early NVIDIA DRM loading for seamless display initialization. |
+| `30-cmdline.conf`      | Embedded kernel command line                                                                | **Deleted** — now superseded by `dracut-ukify.conf`.                             |
+
+> [!TIP] 
+> **Why the Command Line Must Not Exist in Both Places**
+> 
+> If `30-cmdline.conf` remains while `dracut-ukify.conf` also defines `--cmdline`, two independent sources of truth coexist. They may not conflict today — but if you later replace the NVMe drive, regenerate LUKS containers, or change any UUID, you must remember to update **both** files in lockstep. Forgetting one produces a UKI with stale parameters that boots to an emergency shell. A single authoritative source eliminates this class of error entirely.
+
+## Part VII - Stale UKI Cleanup
+
+The manual `dracut` invocations from Chapter VII may have produced UKI files with a different naming convention than `dracut-ukify` uses. Identify and remove them:
+
+```bash
+ls -lh /boot/EFI/Linux/
+```
+
+> [!NOTE] 
+> **Identifying Stale Files**
+> 
+> `dracut-ukify` produces files matching the pattern defined in `ukify_install_path`:
+>
+> ```
+> arch-linux-g14-<version>.efi
+> arch-linux-lts-<version>.efi
+> ```
+> 
+> Any `.efi` file in this directory that does **not** follow this naming scheme — for example, files containing `machine_id`, a different prefix, or a different version separator — is a leftover from the manual workflow. These stale files will appear as phantom boot entries in `systemd-boot` with potentially outdated or incorrect kernel command lines.
+
+Remove only the identified stale files:
+
+```bash
+sudo rm /boot/EFI/Linux/<old-naming-pattern>.efi
+```
+
+> [!WARNING] 
+> **Do Not Blindly Delete All `.efi` Files**
+> 
+> Verify the naming pattern carefully before removing anything. Deleting the newly generated UKIs will leave you with no bootable kernel images. If uncertain, use `bootctl list` to see which entries `systemd-boot` recognizes and cross-reference with the filenames.
+
+## Part VIII - Generate and Verify
+
+### A - Trigger UKI Generation
+
+Reinstall both kernel packages to fire the `dracut-ukify` hook:
+
+```bash
+sudo pacman -S linux-g14 linux-lts
+```
+
+> [!NOTE] 
+> **Why Reinstall?**
+> 
+> Pacman hooks trigger on package transactions. Since both kernels are already installed, a `-S` (install) operation detects them as reinstallations and fires the `dracut-ukify` hook for each. This is the cleanest method to produce the initial automated UKIs without waiting for the next upstream kernel update.
+
+### B - Verify UKI Files Exist
+
+```bash
+ls -lh /boot/EFI/Linux/
+```
+
+Expected output — two files, each approximately 60–120 MB:
+
+```
+arch-linux-g14-<version>.efi
+arch-linux-lts-<version>.efi
+```
+
+### C - Verify Boot Entries
+
+```bash
+bootctl list
+```
+
+Both kernels should appear as auto-detected entries. `systemd-boot` reads the `.osrel` and `.cmdline` PE sections embedded in each UKI to populate the entry name and boot parameters — no manual loader entries required.
+
+### D - Verify Secure Boot Signatures
+
+```bash
+sbctl verify
+```
+
+Every `.efi` file in `/boot/EFI/Linux/` should report as **Signed**. The `systemd-boot` manager binaries (`systemd-bootx64.efi`, `BOOTX64.EFI`) should also remain signed from Chapter VIII.
+
+> [!WARNING] 
+> **If Any File Reports "Not Signed"**
+> 
+| Cause                                                                                 | Diagnosis                                                                                    | Resolution                                                            |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Key path typo in `dracut-ukify.conf`                                                  | `ls` the exact paths — check for `db.key` vs `db.pem` vs `db.crt`                            | Correct the path and regenerate: `sudo pacman -S linux-g14 linux-lts` |
+| Keys declared in `/etc/dracut.conf.d/` instead of `/etc/dracut-ukify.conf`            | Check both locations; `dracut-ukify` ignores keys in the dracut folder                       | Move the signing directives to `/etc/dracut-ukify.conf`               |
+| Stale UKI from the previous chapter (signed with `sbctl sign`, not by `dracut-ukify`) | File was re-generated by `dracut-ukify` without signing keys; old signed version overwritten | Fix the configuration and regenerate                                  |
+
+### E - Verify Embedded Command Line
+
+Extract the command line from one of the UKIs to confirm correctness:
+
+```bash
+objdump -s -j .cmdline /boot/EFI/Linux/arch-linux-lts-*.efi | tail -5
+```
+
+> [!TIP] 
+> **What to Look For**
+> 
+> The output should contain your actual LUKS UUID and Btrfs root UUID — not placeholder text (`<LUKS_UUID>`), and no references to `lvm`, `ext4`, or parameters from previous installations. `nvidia_drm.modeset=1` must be present for proper GPU initialization, and `rootflags=subvol=@` must appear to ensure the correct Btrfs subvolume is mounted as root.
