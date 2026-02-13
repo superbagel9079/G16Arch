@@ -86,11 +86,12 @@ nvme id-ctrl /dev/nvme1 -H | grep -E 'Sanitize|Crypto'
 > 
 > The NVMe specification defines two distinct erasure mechanisms:
 > 
-> |Characteristic|`sanitize`|`format --ses`|
-|---|---|---|
-|**Scope**|Entire controller — all namespaces, all caches, all over-provisioned area.|Single namespace only.|
-|**Survives reboot**|Yes — the controller resumes the operation autonomously after power restoration.|No — interruption may leave the drive in an undefined state.|
-|**Guarantees**|Data is irrecoverable per NIST SP 800-88 "Purge" level.|Data is irrecoverable per NIST SP 800-88 "Clear" level.|
+> 
+| Characteristic      | `sanitize`                                                                       | `format --ses`                                               |
+| ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Scope**           | Entire controller — all namespaces, all caches, all over-provisioned area.       | Single namespace only.                                       |
+| **Survives reboot** | Yes — the controller resumes the operation autonomously after power restoration. | No — interruption may leave the drive in an undefined state. |
+| **Guarantees**      | Data is irrecoverable per NIST SP 800-88 "Purge" level.                          | Data is irrecoverable per NIST SP 800-88 "Clear" level.      |
 
 ### Option A - Crypto Erase (Fastest and Secure)
 
@@ -1962,3 +1963,4 @@ reboot
 > ```
 > 
 > Any failures at this stage should be investigated before proceeding to install a desktop environment, window manager, or additional software.
+
