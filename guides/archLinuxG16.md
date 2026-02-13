@@ -293,8 +293,6 @@ ping -c 3 archlinux.org
 
  If it shows `Hard blocked: yes`, you have a physical toggle or BIOS setting disabling the radio. Check your ASUS BIOS under **Advanced > Wireless** and ensure the adapter is enabled. Then retry from step A.
 
----
-
 ## Part II - Time Synchronization
 
 Accurate system time is a non-negotiable prerequisite before proceeding. Two critical processes depend on it:
@@ -451,11 +449,11 @@ parted -s /dev/nvme1n1 mkpart "cryptVMs" 70% 100%
 > 
 > There are three reasons for this architectural decision:
 > 
-> **A — Filesystem Isolation.** The OS partition will use Btrfs (optimized for snapshots and compression). VM disk images perform poorly on Copy-on-Write filesystems due to fragmentation. The VM partition will use XFS, which is the industry standard for large, sequentially-written files.
+> **A - Filesystem Isolation.** The OS partition will use Btrfs (optimized for snapshots and compression). VM disk images perform poorly on Copy-on-Write filesystems due to fragmentation. The VM partition will use XFS, which is the industry standard for large, sequentially-written files.
 > 
-> **B — Security Compartmentalization.** Each LUKS2 container can use a different passphrase. If you handle client data inside VMs, this provides a cryptographic boundary — unlocking the OS does not automatically expose VM contents.
+> **B - Security Compartmentalization.** Each LUKS2 container can use a different passphrase. If you handle client data inside VMs, this provides a cryptographic boundary — unlocking the OS does not automatically expose VM contents.
 > 
-> **C — Snapshot Hygiene.** Btrfs snapshots of the root filesystem will not inadvertently include 200+ GB of VM images, keeping snapshot sizes manageable and rollback operations fast.
+> **C - Snapshot Hygiene.** Btrfs snapshots of the root filesystem will not inadvertently include 200+ GB of VM images, keeping snapshot sizes manageable and rollback operations fast.
 
 ### E - Verification and Alignment Check
 
