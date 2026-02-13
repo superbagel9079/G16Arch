@@ -2013,11 +2013,11 @@ Your existing dracut drop-in configurations in `/etc/dracut.conf.d/` remain full
 > ```
 > 
 > ```bash
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si
-cd ..
-rm -rf yay-bin
+>git clone https://aur.archlinux.org/yay-bin.git
+>cd yay-bin
+>makepkg -si
+>cd ..
+>rm -rf yay-bin
 >```
 
 > [!NOTE] 
@@ -2198,8 +2198,8 @@ ukify_install_path=(
 >
 The default template includes `${machine_id}` and `${build_id}`, which produce unnecessarily long filenames without adding useful differentiation on a single-machine system. The simplified `${id}-${name}-${version}` scheme produces clean, readable entries:
 >```
-arch-linux-g14-6.12.10-1-g14.efi
-arch-linux-lts-6.12.10-1-lts.efi
+>arch-linux-g14-6.12.10-1-g14.efi
+>arch-linux-lts-6.12.10-1-lts.efi
 >```
 
 ### E - Verify Signing Key Paths
