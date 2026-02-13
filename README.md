@@ -20,7 +20,7 @@ This repository contains optimized guides for the following system:
 > **Data Safety**: Always backup your data before following any installation guide. Verify all commands and device paths before execution to avoid irreversible data loss.
 
 > [!IMPORTANT]
-> **Documentation Status**: Actively maintained and updated for Arch Linux rolling release. Last verified: 2025-10-18.
+> **Documentation Status**: Actively maintained and updated for Arch Linux rolling release. Last verified: 2026-02-13.
 
 ## Available Guides
 
