@@ -1799,7 +1799,7 @@ Expected output: every listed file should show a status of **Signed**. If any fi
 
 This is the final chapter of the installation. We enable the daemons that provide runtime functionality, then perform a clean dismount sequence that ensures every buffer is flushed, every filesystem is cleanly unmounted, and every encrypted volume is properly closed before the first boot.
 
-## Part I - Enable Essential Services
+## Part I — Enable Essential Services
 
 These services are **enabled** (scheduled to start at boot) but not **started** — we are still inside a chroot with no active init system. They will activate on the first real boot.
 
@@ -1808,35 +1808,39 @@ systemctl enable NetworkManager
 systemctl enable systemd-timesyncd
 systemctl enable power-profiles-daemon
 systemctl enable supergfxd
+systemctl enable fstrim.timer
 ```
 
-> [!NOTE] **Service Breakdown**
+> [!NOTE] 
+> **Service Breakdown**
 > 
-> |Service|Unit Type|Function|Consequence If Missing|
-> |---|---|---|---|
-> |`NetworkManager`|System service|Manages all network interfaces — Wi-Fi (via the `iwd` backend we configured in Chapter VI), Ethernet, VPN connections. Provides `nmcli` and `nmtui` for command-line network management.|No network connectivity after boot. Wi-Fi will not associate, no DHCP lease will be obtained.|
-> |`systemd-timesyncd`|System service|Lightweight SNTP (Simple Network Time Protocol) client. Synchronizes the system clock against NTP servers on every boot and periodically thereafter.|Clock drift accumulates over time. TLS certificate validation may fail (certificates have validity windows). `pacman` signature checks may fail if the clock is sufficiently skewed. Filesystem timestamps become unreliable.|
-> |`power-profiles-daemon`|System service|Exposes power profile switching via D-Bus — `power-saver`, `balanced`, `performance`. Integrates with desktop environments (GNOME, KDE) and with `asusctl` for ASUS-specific performance modes.|Laptop runs at default firmware power state. No userspace control over CPU frequency governor or platform power limits. Battery life on a mobile workstation becomes unpredictable.|
-> |`supergfxd`|System service|Daemon for `supergfxctl` — manages GPU mode switching between Integrated (Intel UHD only), Hybrid (NVIDIA on-demand via PRIME offloading), Dedicated (NVIDIA only), and Compute (NVIDIA for CUDA workloads without display).|The system defaults to whatever GPU mode was last configured in firmware. You lose the ability to dynamically switch between battery-efficient integrated graphics and NVIDIA performance without rebooting.|
-> 
-> _Reference: Arch Wiki — NetworkManager ([https://wiki.archlinux.org/title/NetworkManager](https://wiki.archlinux.org/title/NetworkManager)); asus-linux.org — supergfxctl documentation_
+| Service                 | Unit Type      | Function                                                                                                                                                                                                                                                | Consequence If Missing                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NetworkManager`        | System service | Manages all network interfaces — Wi-Fi (via the `iwd` backend we configured in Chapter VI), Ethernet, VPN connections. Provides `nmcli` and `nmtui` for command-line network management.                                                                | No network connectivity after boot. Wi-Fi will not associate, no DHCP lease will be obtained.                                                                                                                                                                                                                                                                             |
+| `systemd-timesyncd`     | System service | Lightweight SNTP (Simple Network Time Protocol) client. Synchronizes the system clock against NTP servers on every boot and periodically thereafter.                                                                                                    | Clock drift accumulates over time. TLS certificate validation may fail (certificates have validity windows). `pacman` signature checks may fail if the clock is sufficiently skewed. Filesystem timestamps become unreliable.                                                                                                                                             |
+| `power-profiles-daemon` | System service | Exposes power profile switching via D-Bus — `power-saver`, `balanced`, `performance`. Integrates with desktop environments (GNOME, KDE) and with `asusctl` for ASUS-specific performance modes.                                                         | Laptop runs at default firmware power state. No userspace control over CPU frequency governor or platform power limits. Battery life on a mobile workstation becomes unpredictable.                                                                                                                                                                                       |
+| `supergfxd`             | System service | Daemon for `supergfxctl` — manages GPU mode switching between Integrated (Intel UHD only), Hybrid (NVIDIA on-demand via PRIME offloading), Dedicated (NVIDIA only), and Compute (NVIDIA for CUDA workloads without display).                            | The system defaults to whatever GPU mode was last configured in firmware. You lose the ability to dynamically switch between battery-efficient integrated graphics and NVIDIA performance without rebooting.                                                                                                                                                              |
+| `fstrim.timer`          | Systemd timer  | Executes `fstrim --fstab --verbose` weekly (every Monday at midnight, with a randomized delay up to 6 hours to avoid thundering herd on multi-system deployments). Sends TRIM commands to all mounted filesystems that support the `discard` operation. | The SSD controller progressively loses track of which blocks are free. Over weeks and months, write amplification increases as the controller must read-erase-write entire NAND blocks instead of writing to pre-erased cells. Sustained write performance degrades measurably — on NVMe drives, this manifests as periodic latency spikes during heavy write operations. |
+> _Reference: Arch Wiki — NetworkManager ([https://wiki.archlinux.org/title/NetworkManager](https://wiki.archlinux.org/title/NetworkManager)); Arch Wiki — Solid state drive ([https://wiki.archlinux.org/title/Solid_state_drive#TRIM](https://wiki.archlinux.org/title/Solid_state_drive#TRIM)); asus-linux.org — supergfxctl documentation_
 
-> [!TIP] 
-> **Verifying Service State After First Boot**
+> [!Abstract] 
+> **`discard=async` in fstab vs `fstrim.timer` — Why Both?**
 > 
-> Once the system is running, confirm that all four services activated correctly:
+> This is a common point of confusion. Our `fstab` entries (generated in Chapter V) already include the `discard=async` mount option. Understanding why the timer is still necessary requires distinguishing between the two TRIM strategies:
 > 
-> ```bash
-> systemctl status NetworkManager systemd-timesyncd power-profiles-daemon supergfxd
-> ```
-> 
-> Any service showing `inactive (dead)` or `failed` requires investigation via:
-> 
-> ```bash
-> journalctl -u <service-name> -b --no-pager
-> ```
-> 
-> The `-b` flag restricts output to the current boot session, filtering out noise from the live environment.
+| Strategy                        | Mechanism                                                                                                                          | Scope                                                                                                                                                                                                                           |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `discard=async` (continuous)    | The filesystem queues TRIM commands as blocks are freed during normal operation, then batches them asynchronously.                 | Handles **ongoing** deletions in real-time. Keeps the SSD informed of newly freed blocks as they occur.                                                                                                                         |
+| `fstrim.timer` (periodic batch) | A scheduled job walks the entire filesystem, identifies **all** unallocated regions, and issues TRIM for the complete set at once. | Acts as a **sweep** — catches anything the continuous discard may have missed, and handles edge cases such as blocks freed during early boot before the filesystem was fully mounted, or regions orphaned by unclean shutdowns. |
+The continuous mechanism handles the steady state. The weekly timer handles the residual. Together, they ensure comprehensive block hygiene. Neither alone is fully sufficient — `discard=async` misses edge cases, and relying solely on weekly `fstrim` means the drive operates with stale block maps for up to seven days between runs.
+There is one additional consideration specific to our encrypted setup. TRIM commands must pass through the LUKS2 layer to reach the physical NVMe controller. By default, `dm-crypt` **blocks** TRIM passthrough for security reasons — TRIM patterns on an encrypted volume can theoretically reveal information about which blocks contain data versus which are empty, weakening the encryption's plausible deniability properties. However, `cryptsetup` since version 2.x with LUKS2 defaults allow this passthrough when `discard` is specified at the filesystem level. Verify that your LUKS containers permit TRIM by checking:
+>```bash
+>dmsetup table cryptos | grep -o 'allow_discards'
+>dmsetup table cryptvms | grep -o 'allow_discards'
+>```
+If `allow_discards` does not appear, the TRIM commands from both mechanisms are silently discarded at the `dm-crypt` layer and never reach the SSD. In that case, you would need to add `--allow-discards` when opening the LUKS containers (via a dracut configuration option for the root volume, and via `crypttab` for any secondary volumes).
+>
+_Reference: Arch Wiki — dm-crypt/Specialties — Discard/TRIM support ([https://wiki.archlinux.org/title/Dm-crypt/Specialties#Discard/TRIM_support_for_solid_state_drives_(SSD)](https://wiki.archlinux.org/title/Dm-crypt/Specialties#Discard/TRIM_support_for_solid_state_drives_\(SSD\)))_
 
 ## Part II - Exit and Clean Dismount
 
