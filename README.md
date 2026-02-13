@@ -26,4 +26,4 @@ This repository contains optimized guides for the following system:
 
 This repository includes the following documentation:
 
-- **[Installation Guide](./guides/arch-rog-zephyrus-g16-installation.md)**: Complete Arch Linux installation with full-disk encryption, LVM, and Secure Boot
+- **[Installation Guide](./guides/archLinuxG16.md)**: Complete Arch Linux installation with full-disk encryption, LVM, and Secure Boot
