@@ -1259,7 +1259,6 @@ Enter the following content:
 ```
 [device]
 wifi.backend=iwd
-EOF
 ```
 
 > [!NOTE] 
