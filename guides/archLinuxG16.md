@@ -1397,7 +1397,6 @@ install -Dm0644 /dev/stdin /etc/dracut.conf.d/00-optimization.conf <<'EOF'
 hostonly="yes"
 hostonly_mode="strict"
 compress="zstd"
-uefi="yes"
 early_microcode="yes"
 EOF
 ```
@@ -1441,7 +1440,7 @@ EOF
 
 ```bash
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/20-graphics.conf <<'EOF'
-force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "
+force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm i915 "
 EOF
 ```
 
