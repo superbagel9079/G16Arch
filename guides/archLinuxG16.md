@@ -925,7 +925,6 @@ pacstrap -K /mnt \
     linux-firmware linux-lts linux-lts-headers \
     sof-firmware \
     intel-ucode \
-    busybox \
     btrfs-progs xfsprogs \
     cryptsetup \
     networkmanager iwd \
@@ -955,7 +954,6 @@ pacstrap -K /mnt \
 > |`linux-lts`, `linux-lts-headers`|Kernel|Long-Term Support kernel. Provides a stable, conservative baseline. The `-headers` package is mandatory for DKMS to compile out-of-tree modules (NVIDIA) against this kernel.|
 > |`sof-firmware`|Firmware|Sound Open Firmware — required for the Intel audio DSP present on modern laptops. Without it, the ASUS G16's speakers and headphone jack will not produce sound.|
 > |`intel-ucode`|Firmware|CPU microcode updates from Intel. Loaded at early boot to patch errata in the CPU's instruction decoder. Essential for stability and security on Intel platforms.|
-> |`busybox`|Recovery|Provides a minimal rescue shell inside the initramfs. If the boot process fails before reaching the root filesystem, `busybox` gives you a shell with basic utilities (`ls`, `mount`, `cat`) to diagnose the issue.|
 > |`btrfs-progs`|Filesystem|Userspace tools for Btrfs — `btrfs subvolume`, `btrfs filesystem`, `btrfs scrub`. Required both at boot (initramfs mounts Btrfs root) and at runtime (maintenance operations).|
 > |`xfsprogs`|Filesystem|Userspace tools for XFS — `xfs_repair`, `xfs_info`, `xfs_growfs`. Required to manage the VM storage partition.|
 > |`cryptsetup`|Encryption|LUKS2 management tool. **Mandatory** — the initramfs uses `cryptsetup` to unlock the encrypted root and VM containers during boot. Without it, the system cannot access its own drive.|
@@ -1421,7 +1419,7 @@ EOF
 
 ```bash
 install -Dm0644 /dev/stdin /etc/dracut.conf.d/10-modules.conf <<'EOF'
-add_dracutmodules+=" crypt btrfs systemd busybox "
+add_dracutmodules+=" crypt btrfs systemd "
 omit_dracutmodules+=" network cifs nfs nbd mdraid brltty "
 EOF
 ```
@@ -1434,7 +1432,6 @@ EOF
 > |**Add**|`crypt`|Provides the LUKS unlock prompt at boot. Without this, dracut cannot open `/dev/nvme1n1p2` and the root filesystem is inaccessible.|
 > ||`btrfs`|Loads `btrfs.ko` and userspace tools needed to mount Btrfs subvolumes. Required for `rootflags=subvol=@` to function.|
 > ||`systemd`|Uses `systemd` as the init framework inside the initramfs (rather than the shell-based fallback). Provides `systemd-cryptsetup` for password prompting, parallel service startup, and structured logging.|
-> ||`busybox`|Embeds a BusyBox recovery shell. If the boot process fails (wrong UUID, missing driver), you drop into this shell to diagnose the problem. Without it, a failed boot produces a kernel panic with no interactive recovery option.|
 > |**Omit**|`network`|Network-based root filesystems (iSCSI, NFS root, PXE). Our root is a local NVMe drive. Including this module adds `dhclient`, DNS resolution, and network interface configuration to the initramfs — all unnecessary weight.|
 > ||`cifs`, `nfs`, `nbd`|Network filesystem clients. Same reasoning — no network storage is involved in the boot process.|
 > ||`mdraid`|Linux software RAID (`md`). Our storage uses LUKS+Btrfs, not RAID arrays.|
